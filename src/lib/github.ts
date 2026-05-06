@@ -45,7 +45,6 @@ function headers() {
 async function ghFetch(path: string) {
   const res = await fetch(`${BASE}${path}`, {
     headers: headers(),
-    next: { revalidate: 60 },
   });
   if (!res.ok) {
     const body = await res.text();

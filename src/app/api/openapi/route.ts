@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import type { FastifyInstance } from "fastify";
 
 export const openApiSpec = {
   openapi: "3.1.0",
@@ -92,6 +92,21 @@ export const openApiSpec = {
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/repositories/export": {
+      get: {
+        summary: "Export repository analysis history as CSV",
+        responses: {
+          "200": {
+            description: "CSV export of repository analysis history",
+            content: {
+              "text/csv": {
+                schema: { type: "string" },
               },
             },
           },
@@ -341,7 +356,19 @@ export const openApiSpec = {
             },
           },
         },
-        required: ["id", "owner", "name", "repoUrl", "helmChartLocations", "dockerLocations", "apiSpecificationLocations", "documentationLocations", "updatedAt", "analysisCount", "latestAnalysis"],
+        required: [
+          "id",
+          "owner",
+          "name",
+          "repoUrl",
+          "helmChartLocations",
+          "dockerLocations",
+          "apiSpecificationLocations",
+          "documentationLocations",
+          "updatedAt",
+          "analysisCount",
+          "latestAnalysis",
+        ],
       },
       RepoMetadata: {
         type: "object",
@@ -448,7 +475,15 @@ export const openApiSpec = {
               createdAt: { type: "string", format: "date-time" },
               updatedAt: { type: "string", format: "date-time" },
             },
-            required: ["id", "repoUrl", "owner", "name", "metadata", "createdAt", "updatedAt"],
+            required: [
+              "id",
+              "repoUrl",
+              "owner",
+              "name",
+              "metadata",
+              "createdAt",
+              "updatedAt",
+            ],
           },
           analyses: {
             type: "array",
@@ -491,7 +526,19 @@ export const openApiSpec = {
           defaultComplexityMaxCcnThreshold: { type: "integer" },
           defaultSpectralRulesetSource: { type: "string" },
         },
-        required: ["scoringConfigId", "complexityThreshold", "complexityMaxCcnThreshold", "spectralRulesetSource", "criterionWeights", "criterionRequirementLevels", "defaultCriterionWeights", "defaultCriterionRequirementLevels", "defaultComplexityThreshold", "defaultComplexityMaxCcnThreshold", "defaultSpectralRulesetSource"],
+        required: [
+          "scoringConfigId",
+          "complexityThreshold",
+          "complexityMaxCcnThreshold",
+          "spectralRulesetSource",
+          "criterionWeights",
+          "criterionRequirementLevels",
+          "defaultCriterionWeights",
+          "defaultCriterionRequirementLevels",
+          "defaultComplexityThreshold",
+          "defaultComplexityMaxCcnThreshold",
+          "defaultSpectralRulesetSource",
+        ],
       },
       RepoMeta: {
         type: "object",
@@ -519,7 +566,17 @@ export const openApiSpec = {
             required: ["source", "detail"],
           },
         },
-        required: ["description", "language", "stars", "forks", "defaultBranch", "topics", "license", "version", "versionEvidence"],
+        required: [
+          "description",
+          "language",
+          "stars",
+          "forks",
+          "defaultBranch",
+          "topics",
+          "license",
+          "version",
+          "versionEvidence",
+        ],
       },
       CheckResult: {
         type: "object",
@@ -569,6 +626,6 @@ export const openApiSpec = {
   },
 };
 
-export async function GET() {
-  return NextResponse.json(openApiSpec);
+export async function registerOpenApiRoute(fastify: FastifyInstance) {
+  fastify.get("/api/openapi", async () => openApiSpec);
 }

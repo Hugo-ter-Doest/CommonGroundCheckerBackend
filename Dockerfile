@@ -18,10 +18,9 @@ ENV HOSTNAME=0.0.0.0
 
 COPY package*.json ./
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/src ./src
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/src/generated ./src/generated
-COPY --from=builder /app/next.config.js ./next.config.js
 
 EXPOSE 3000
 CMD ["npm", "run", "start"]

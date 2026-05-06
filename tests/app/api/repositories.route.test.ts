@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { NextRequest } from "next/server";
+import Fastify from "fastify";
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -7,36 +7,41 @@ vi.mock("@/lib/db", () => ({
       upsert: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      findFirst: vi.fn(),
     },
     repoAnalysis: {
       create: vi.fn(),
     },
+    $disconnect: vi.fn(),
   },
 }));
 
 import { prisma } from "@/lib/db";
-import { GET as getOpenApi } from "@/app/api/openapi/route";
-import { POST as postRepo } from "@/app/api/repositories/route";
-import { POST as postRepoAnalysis } from "@/app/api/repositories/[repoId]/analyses/route";
+import { buildServer } from "@/server";
+
+let app: ReturnType<typeof buildServer>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  app = buildServer();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await app.close();
   vi.clearAllMocks();
 });
 
 describe("API route tests", () => {
   describe("GET /api/openapi", () => {
     it("returns the OpenAPI specification", async () => {
-      const response = await getOpenApi();
-      expect(response.status).toBe(200);
+      const response = await app.inject({ method: "GET", url: "/api/openapi" });
+      expect(response.statusCode).toBe(200);
 
-      const body = await response.json();
+      const body = JSON.parse(response.payload);
       expect(body).toHaveProperty("openapi", "3.1.0");
       expect(body).toHaveProperty("paths");
       expect(body.paths).toHaveProperty("/api/repositories");
+      expect(body.paths).toHaveProperty("/api/repositories/export");
       expect(body.paths).toHaveProperty("/api/repositories/{repoId}/analyses");
     });
   });
@@ -58,18 +63,18 @@ describe("API route tests", () => {
       };
       (prisma.repo.upsert as ReturnType<typeof vi.fn>).mockResolvedValue(mockRepo);
 
-      const request = {
-        json: async () => ({
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/repositories",
+        payload: {
           repoUrl: "https://github.com/example/repo",
           description: "A sample repository",
-        }),
-      } as unknown as NextRequest;
-
-      const response = await postRepo(request);
+        },
+      });
       expect(prisma.repo.upsert).toHaveBeenCalled();
-      expect(response.status).toBe(200);
+      expect(response.statusCode).toBe(200);
 
-      const body = await response.json();
+      const body = JSON.parse(response.payload);
       expect(body).toMatchObject({
         id: "repo-id",
         owner: "example",
@@ -84,25 +89,26 @@ describe("API route tests", () => {
     });
 
     it("returns 400 when repoUrl is missing", async () => {
-      const request = {
-        json: async () => ({ description: "No repo URL" }),
-      } as unknown as NextRequest;
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/repositories",
+        payload: { description: "No repo URL" },
+      });
 
-      const response = await postRepo(request);
-      expect(response.status).toBe(400);
-
-      const body = await response.json();
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.payload);
       expect(body).toEqual({ error: "Missing required field: repoUrl" });
     });
 
     it("returns 400 for an invalid GitHub repoUrl", async () => {
-      const request = {
-        json: async () => ({ repoUrl: "https://example.com/not-github/repo" }),
-      } as unknown as NextRequest;
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/repositories",
+        payload: { repoUrl: "https://example.com/not-github/repo" },
+      });
 
-      const response = await postRepo(request);
-      expect(response.status).toBe(400);
-      const body = await response.json();
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.payload);
       expect(body.error).toContain("Invalid GitHub URL");
     });
   });
@@ -111,39 +117,37 @@ describe("API route tests", () => {
     it("returns 404 when the repository does not exist", async () => {
       (prisma.repo.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
-      const request = {
-        json: async () => ({
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/repositories/missing-repo/analyses",
+        payload: {
           checkedAt: "2026-05-06T00:00:00Z",
           score: 65,
           results: [],
-        }),
-      } as unknown as NextRequest;
-
-      const response = await postRepoAnalysis(request, {
-        params: Promise.resolve({ repoId: "missing-repo" }),
+        },
       });
+
       expect(prisma.repo.findUnique).toHaveBeenCalledWith({ where: { id: "missing-repo" } });
-      expect(response.status).toBe(404);
-      const body = await response.json();
+      expect(response.statusCode).toBe(404);
+      const body = JSON.parse(response.payload);
       expect(body).toEqual({ error: "Repository not found." });
     });
 
     it("returns 400 when the payload is invalid", async () => {
       (prisma.repo.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "repo-id" });
 
-      const request = {
-        json: async () => ({
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/repositories/repo-id/analyses",
+        payload: {
           checkedAt: "not-a-date",
           score: 65,
           results: [],
-        }),
-      } as unknown as NextRequest;
-
-      const response = await postRepoAnalysis(request, {
-        params: Promise.resolve({ repoId: "repo-id" }),
+        },
       });
-      expect(response.status).toBe(400);
-      const body = await response.json();
+
+      expect(response.statusCode).toBe(400);
+      const body = JSON.parse(response.payload);
       expect(body.error).toContain("Missing or invalid checkedAt field.");
     });
 
@@ -161,17 +165,16 @@ describe("API route tests", () => {
       };
       (prisma.repoAnalysis.create as ReturnType<typeof vi.fn>).mockResolvedValue(mockAnalysis);
 
-      const request = {
-        json: async () => ({
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/repositories/repo-id/analyses",
+        payload: {
           checkedAt: "2026-05-06T00:00:00Z",
           score: 80,
           results: [],
-        }),
-      } as unknown as NextRequest;
-
-      const response = await postRepoAnalysis(request, {
-        params: Promise.resolve({ repoId: "repo-id" }),
+        },
       });
+
       expect(prisma.repoAnalysis.create).toHaveBeenCalledWith({
         data: {
           repoId: "repo-id",
@@ -182,9 +185,9 @@ describe("API route tests", () => {
           results: [],
         },
       });
-      expect(response.status).toBe(201);
+      expect(response.statusCode).toBe(201);
 
-      const body = await response.json();
+      const body = JSON.parse(response.payload);
       expect(body).toEqual({
         id: "analysis-id",
         repoId: "repo-id",

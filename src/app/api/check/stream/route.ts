@@ -1,4 +1,5 @@
-import { NextRequest } from "next/server";
+import { Readable } from "node:stream";
+import type { FastifyInstance } from "fastify";
 import { runChecks } from "@/lib/checkers";
 import { parseGitHubUrl } from "@/lib/github";
 import { prisma } from "@/lib/db";
@@ -12,53 +13,67 @@ export interface ProgressEvent {
   error?: string;
 }
 
-export async function POST(req: NextRequest) {
-  const body = await req.json();
+export async function registerCheckStreamRoute(fastify: FastifyInstance) {
+  fastify.post("/api/check/stream", async (request, reply) => {
+    const body = request.body as Record<string, unknown> | undefined;
 
-  const repoUrl: string = body?.repoUrl ?? "";
-  const helmChartLocations: string[] = Array.isArray(body?.helmChartLocations)
-    ? body.helmChartLocations
-        .filter((v: unknown) => typeof v === "string")
-        .map((v: string) => v.trim().replace(/^\/+|\/+$/g, ""))
-        .filter(Boolean)
-    : [];
-  const documentationLocations: string[] = Array.isArray(
-    body?.documentationLocations
-  )
-    ? body.documentationLocations
-        .filter((v: unknown) => typeof v === "string")
-        .map((v: string) => v.trim())
-        .filter(Boolean)
-    : [];
-  const dockerLocations: string[] = Array.isArray(body?.dockerLocations)
-    ? body.dockerLocations
-        .filter((v: unknown) => typeof v === "string")
-        .map((v: string) => v.trim())
-        .filter(Boolean)
-    : [];
-  const apiSpecificationLocations: string[] = Array.isArray(
-    body?.apiSpecificationLocations
-  )
-    ? body.apiSpecificationLocations
-        .filter((v: unknown) => typeof v === "string")
-        .map((v: string) => v.trim())
-        .filter(Boolean)
-    : [];
-  const isRegister = body?.isRegister === true;
+    const repoUrl = typeof body?.repoUrl === "string" ? body.repoUrl : "";
+    const helmChartLocations: string[] = Array.isArray(body?.helmChartLocations)
+      ? body.helmChartLocations
+          .filter((v: unknown) => typeof v === "string")
+          .map((v: string) => v.trim().replace(/^\/+|\/+$/g, ""))
+          .filter(Boolean)
+      : [];
+    const documentationLocations: string[] = Array.isArray(
+      body?.documentationLocations
+    )
+      ? body.documentationLocations
+          .filter((v: unknown) => typeof v === "string")
+          .map((v: string) => v.trim())
+          .filter(Boolean)
+      : [];
+    const dockerLocations: string[] = Array.isArray(body?.dockerLocations)
+      ? body.dockerLocations
+          .filter((v: unknown) => typeof v === "string")
+          .map((v: string) => v.trim())
+          .filter(Boolean)
+      : [];
+    const apiSpecificationLocations: string[] = Array.isArray(
+      body?.apiSpecificationLocations
+    )
+      ? body.apiSpecificationLocations
+          .filter((v: unknown) => typeof v === "string")
+          .map((v: string) => v.trim())
+          .filter(Boolean)
+      : [];
+    const isRegister = body?.isRegister === true;
 
-  const encoder = new TextEncoder();
+    const stream = new Readable({
+      read() {},
+    });
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (payload: ProgressEvent) => {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(payload)}\n\n`)
-        );
-      };
+    const send = (payload: ProgressEvent) => {
+      stream.push(`data: ${JSON.stringify(payload)}\n\n`);
+    };
 
+    const finish = () => {
+      if (!stream.destroyed) {
+        stream.push(null);
+      }
+    };
+
+    reply.headers({
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    });
+
+    request.raw.on("close", finish);
+
+    (async () => {
       if (!repoUrl) {
         send({ step: "Error", pct: 0, error: "Missing required field: repoUrl" });
-        controller.close();
+        finish();
         return;
       }
 
@@ -69,7 +84,7 @@ export async function POST(req: NextRequest) {
           error:
             "Invalid GitHub URL. Please provide a URL like https://github.com/owner/repo",
         });
-        controller.close();
+        finish();
         return;
       }
 
@@ -160,16 +175,10 @@ export async function POST(req: NextRequest) {
             : message,
         });
       } finally {
-        controller.close();
+        finish();
       }
-    },
-  });
+    })();
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-    },
+    return reply.send(stream);
   });
 }

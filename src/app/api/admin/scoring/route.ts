@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   DEFAULT_COMPLEXITY_MAX_CCN_THRESHOLD,
   DEFAULT_COMPLEXITY_THRESHOLD,
@@ -7,6 +7,15 @@ import {
   getScoringConfig,
   saveCriterionWeights,
 } from "@/lib/checkers/config";
+
+type ScoringRouteBody = {
+  reset?: boolean;
+  complexityThreshold?: number;
+  complexityMaxCcnThreshold?: number;
+  spectralRulesetSource?: string;
+  criterionWeights?: unknown;
+  criterionRequirementLevels?: unknown;
+};
 
 function extractWeightsFromPayload(payload: unknown): Record<string, number> {
   if (!payload || typeof payload !== "object") return {};
@@ -76,95 +85,102 @@ function extractSpectralRulesetSourceFromPayload(
   return value;
 }
 
-export async function GET() {
-  try {
-    const scoringConfig = await getScoringConfig();
+export async function registerAdminScoringRoute(fastify: FastifyInstance) {
+  fastify.get("/api/admin/scoring", async (request, reply) => {
+    try {
+      const scoringConfig = await getScoringConfig();
 
-    return NextResponse.json({
-      criterionWeights: Object.fromEntries(
-        Object.entries(scoringConfig.criterionConfigByCheckId).map(([checkId, config]) => [
-          checkId,
-          config.weight,
-        ])
-      ),
-      criterionRequirementLevels: Object.fromEntries(
-        Object.entries(scoringConfig.criterionConfigByCheckId).map(([checkId, config]) => [
-          checkId,
-          config.requirementLevel,
-        ])
-      ),
-      complexityThreshold: scoringConfig.complexityThreshold,
-      complexityMaxCcnThreshold: scoringConfig.complexityMaxCcnThreshold,
-      spectralRulesetSource: scoringConfig.spectralRulesetSource,
-      defaultCriterionWeights: Object.fromEntries(
-        Object.entries(DEFAULT_CRITERION_CONFIG_BY_CHECK_ID).map(([checkId, config]) => [
-          checkId,
-          config.weight,
-        ])
-      ),
-      defaultCriterionRequirementLevels: Object.fromEntries(
-        Object.entries(DEFAULT_CRITERION_CONFIG_BY_CHECK_ID).map(([checkId, config]) => [
-          checkId,
-          config.requirementLevel,
-        ])
-      ),
-      defaultComplexityThreshold: DEFAULT_COMPLEXITY_THRESHOLD,
-      defaultComplexityMaxCcnThreshold: DEFAULT_COMPLEXITY_MAX_CCN_THRESHOLD,
-      defaultSpectralRulesetSource: DEFAULT_SPECTRAL_RULESET_SOURCE,
-    });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unexpected error.";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+      return {
+        criterionWeights: Object.fromEntries(
+          Object.entries(scoringConfig.criterionConfigByCheckId).map(([checkId, config]) => [
+            checkId,
+            config.weight,
+          ])
+        ),
+        criterionRequirementLevels: Object.fromEntries(
+          Object.entries(scoringConfig.criterionConfigByCheckId).map(([checkId, config]) => [
+            checkId,
+            config.requirementLevel,
+          ])
+        ),
+        complexityThreshold: scoringConfig.complexityThreshold,
+        complexityMaxCcnThreshold: scoringConfig.complexityMaxCcnThreshold,
+        spectralRulesetSource: scoringConfig.spectralRulesetSource,
+        defaultCriterionWeights: Object.fromEntries(
+          Object.entries(DEFAULT_CRITERION_CONFIG_BY_CHECK_ID).map(([checkId, config]) => [
+            checkId,
+            config.weight,
+          ])
+        ),
+        defaultCriterionRequirementLevels: Object.fromEntries(
+          Object.entries(DEFAULT_CRITERION_CONFIG_BY_CHECK_ID).map(([checkId, config]) => [
+            checkId,
+            config.requirementLevel,
+          ])
+        ),
+        defaultComplexityThreshold: DEFAULT_COMPLEXITY_THRESHOLD,
+        defaultComplexityMaxCcnThreshold: DEFAULT_COMPLEXITY_MAX_CCN_THRESHOLD,
+        defaultSpectralRulesetSource: DEFAULT_SPECTRAL_RULESET_SOURCE,
+      };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unexpected error.";
+      return reply.status(500).send({ error: message });
+    }
+  });
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const reset = body?.reset === true;
-    const incomingThreshold = extractComplexityThresholdFromPayload(body);
-    const incomingMaxThreshold =
-      extractComplexityMaxCcnThresholdFromPayload(body);
-    const incomingSpectralRulesetSource =
-      extractSpectralRulesetSourceFromPayload(body);
+  fastify.post(
+    "/api/admin/scoring",
+    async (
+      request: FastifyRequest<{ Body: ScoringRouteBody }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        const body = request.body ?? {};
+        const reset = body.reset === true;
+        const incomingThreshold = extractComplexityThresholdFromPayload(body);
+        const incomingMaxThreshold = extractComplexityMaxCcnThresholdFromPayload(body);
+        const incomingSpectralRulesetSource = extractSpectralRulesetSourceFromPayload(body);
 
-    const activeConfig = reset
-      ? await saveCriterionWeights(
-          {},
-          DEFAULT_COMPLEXITY_THRESHOLD,
-          DEFAULT_COMPLEXITY_MAX_CCN_THRESHOLD,
-          {},
-          DEFAULT_SPECTRAL_RULESET_SOURCE
-        )
-      : await saveCriterionWeights(
-          extractWeightsFromPayload(body?.criterionWeights),
-          incomingThreshold,
-          incomingMaxThreshold,
-          extractRequirementLevelsFromPayload(body?.criterionRequirementLevels),
-          incomingSpectralRulesetSource
-        );
+        const activeConfig = reset
+          ? await saveCriterionWeights(
+              {},
+              DEFAULT_COMPLEXITY_THRESHOLD,
+              DEFAULT_COMPLEXITY_MAX_CCN_THRESHOLD,
+              {},
+              DEFAULT_SPECTRAL_RULESET_SOURCE
+            )
+          : await saveCriterionWeights(
+              extractWeightsFromPayload(body?.criterionWeights),
+              incomingThreshold,
+              incomingMaxThreshold,
+              extractRequirementLevelsFromPayload(body?.criterionRequirementLevels),
+              incomingSpectralRulesetSource
+            );
 
-    return NextResponse.json({
-      ok: true,
-      scoringConfigId: activeConfig.id,
-      complexityThreshold: activeConfig.config.complexityThreshold,
-      complexityMaxCcnThreshold: activeConfig.config.complexityMaxCcnThreshold,
-      spectralRulesetSource: activeConfig.config.spectralRulesetSource,
-      criterionWeights: Object.fromEntries(
-        Object.entries(activeConfig.config.criterionConfigByCheckId).map(([checkId, config]) => [
-          checkId,
-          config.weight,
-        ])
-      ),
-      criterionRequirementLevels: Object.fromEntries(
-        Object.entries(activeConfig.config.criterionConfigByCheckId).map(([checkId, config]) => [
-          checkId,
-          config.requirementLevel,
-        ])
-      ),
-    });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unexpected error.";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+        return {
+          ok: true,
+          scoringConfigId: activeConfig.id,
+          complexityThreshold: activeConfig.config.complexityThreshold,
+          complexityMaxCcnThreshold:
+            activeConfig.config.complexityMaxCcnThreshold,
+          spectralRulesetSource: activeConfig.config.spectralRulesetSource,
+          criterionWeights: Object.fromEntries(
+            Object.entries(activeConfig.config.criterionConfigByCheckId).map(([checkId, config]) => [
+              checkId,
+              config.weight,
+            ])
+          ),
+          criterionRequirementLevels: Object.fromEntries(
+            Object.entries(activeConfig.config.criterionConfigByCheckId).map(([checkId, config]) => [
+              checkId,
+              config.requirementLevel,
+            ])
+          ),
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Unexpected error.";
+        return reply.status(500).send({ error: message });
+      }
+    }
+  );
 }

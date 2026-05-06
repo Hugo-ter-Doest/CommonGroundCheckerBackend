@@ -1,3 +1,4 @@
+import type { FastifyInstance } from "fastify";
 import { prisma } from "@/lib/db";
 
 function escapeCsvCell(value: unknown): string {
@@ -38,91 +39,93 @@ function normalizeResults(raw: unknown): NormalizedResult[] {
     }));
 }
 
-export async function GET() {
-  const repositories = await prisma.repo.findMany({
-    orderBy: [{ owner: "asc" }, { name: "asc" }],
-    include: {
-      analyses: {
-        orderBy: { checkedAt: "desc" },
-        take: 1,
-        select: {
-          checkedAt: true,
-          score: true,
-          version: true,
-          results: true,
+export async function registerRepositoriesExportRoute(fastify: FastifyInstance) {
+  fastify.get("/api/repositories/export", async (request, reply) => {
+    const repositories = await prisma.repo.findMany({
+      orderBy: [{ owner: "asc" }, { name: "asc" }],
+      include: {
+        analyses: {
+          orderBy: { checkedAt: "desc" },
+          take: 1,
+          select: {
+            checkedAt: true,
+            score: true,
+            version: true,
+            results: true,
+          },
+        },
+        _count: {
+          select: { analyses: true },
         },
       },
-      _count: {
-        select: { analyses: true },
-      },
-    },
-  });
-
-  const resultIds = new Set<string>();
-  const rows = repositories
-    .filter((repository) => repository.analyses[0] !== undefined)
-    .map((repository) => {
-      const latestAnalysis = repository.analyses[0]!;
-      const results = normalizeResults(latestAnalysis.results);
-      results.forEach((result) => resultIds.add(result.id));
-
-      return {
-        repository,
-        latestAnalysis,
-        results,
-      };
     });
 
-  const sortedResultIds = Array.from(resultIds).sort();
-  const resultHeaders = sortedResultIds.flatMap((id) => [
-    `result_${id}_status`,
-    `result_${id}_requirementLevel`,
-    `result_${id}_message`,
-  ]);
+    const resultIds = new Set<string>();
+    const rows = repositories
+      .filter((repository) => repository.analyses[0] !== undefined)
+      .map((repository) => {
+        const latestAnalysis = repository.analyses[0]!;
+        const results = normalizeResults(latestAnalysis.results);
+        results.forEach((result) => resultIds.add(result.id));
 
-  const header = [
-    "owner",
-    "name",
-    "repoUrl",
-    "latestCheckedAt",
-    "latestScore",
-    "latestVersion",
-    "analysisCount",
-    ...resultHeaders,
-    "latestResultsJson",
-  ].join(",");
+        return {
+          repository,
+          latestAnalysis,
+          results,
+        };
+      });
 
-  const csvRows = rows.map(({ repository, latestAnalysis, results }) => {
-    const resultMap = new Map(results.map((result) => [result.id, result]));
+    const sortedResultIds = Array.from(resultIds).sort();
+    const resultHeaders = sortedResultIds.flatMap((id) => [
+      `result_${id}_status`,
+      `result_${id}_requirementLevel`,
+      `result_${id}_message`,
+    ]);
 
-    const rowCells = [
-      escapeCsvCell(repository.owner),
-      escapeCsvCell(repository.name),
-      escapeCsvCell(repository.repoUrl),
-      escapeCsvCell(latestAnalysis.checkedAt.toISOString()),
-      escapeCsvCell(latestAnalysis.score),
-      escapeCsvCell(latestAnalysis.version ?? ""),
-      escapeCsvCell(repository._count.analyses),
-      ...sortedResultIds.flatMap((id) => {
-        const result = resultMap.get(id);
-        return [
-          escapeCsvCell(result?.status ?? ""),
-          escapeCsvCell(result?.requirementLevel ?? ""),
-          escapeCsvCell(result?.message ?? ""),
-        ];
-      }),
-      escapeCsvCell(JSON.stringify(latestAnalysis.results ?? [])),
-    ];
+    const header = [
+      "owner",
+      "name",
+      "repoUrl",
+      "latestCheckedAt",
+      "latestScore",
+      "latestVersion",
+      "analysisCount",
+      ...resultHeaders,
+      "latestResultsJson",
+    ].join(",");
 
-    return rowCells.join(",");
-  });
+    const csvRows = rows.map(({ repository, latestAnalysis, results }) => {
+      const resultMap = new Map(results.map((result) => [result.id, result]));
 
-  const csv = [header, ...csvRows].join("\r\n") + "\r\n";
+      const rowCells = [
+        escapeCsvCell(repository.owner),
+        escapeCsvCell(repository.name),
+        escapeCsvCell(repository.repoUrl),
+        escapeCsvCell(latestAnalysis.checkedAt.toISOString()),
+        escapeCsvCell(latestAnalysis.score),
+        escapeCsvCell(latestAnalysis.version ?? ""),
+        escapeCsvCell(repository._count.analyses),
+        ...sortedResultIds.flatMap((id) => {
+          const result = resultMap.get(id);
+          return [
+            escapeCsvCell(result?.status ?? ""),
+            escapeCsvCell(result?.requirementLevel ?? ""),
+            escapeCsvCell(result?.message ?? ""),
+          ];
+        }),
+        escapeCsvCell(JSON.stringify(latestAnalysis.results ?? [])),
+      ];
 
-  return new Response(csv, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": "attachment; filename=common-ground-checker-history.csv",
-    },
+      return rowCells.join(",");
+    });
+
+    const csv = [header, ...csvRows].join("\r\n") + "\r\n";
+
+    reply.header("Content-Type", "text/csv; charset=utf-8");
+    reply.header(
+      "Content-Disposition",
+      "attachment; filename=common-ground-checker-history.csv"
+    );
+    return reply.send(csv);
   });
 }
