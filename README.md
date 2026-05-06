@@ -132,13 +132,6 @@ npm test
 - The backend exposes an OpenAPI JSON document at `/api/openapi`.
 - The CSV export endpoint is available at `/api/repositories/export`.
 
-## Development notes
-
-- The application no longer relies on Next.js or React in the backend.
-- `src/server.ts` registers Fastify routes from the API modules under `src/app/api`.
-- `src/lib/checkers` contains the analysis logic and criteria used to assess repositories.
-- `src/lib/github.ts` contains the GitHub API integration used by analysis checkers.
-
 ## License
 
 This project is licensed under the EUPL-1.2 license.
