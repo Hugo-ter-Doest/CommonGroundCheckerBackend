@@ -44,6 +44,7 @@ The backend is structured into the following layers:
 
 - `/api/repositories` expects JSON metadata containing `repoUrl` and optional repository fields.
 - `/api/check` and `/api/check/stream` expect JSON analysis request payloads and return repository scoring results.
+- The literal OpenAPI specification is stored in `src/app/api/openapi/openapi.yaml` and served by `/api/openapi`.
 - `/api/repositories/{repoId}/analyses` expects analysis result payloads including `checkedAt`, `score`, and `results`.
 - `/api/admin/scoring` exposes and persists custom scoring parameters for criterion weights, complexity thresholds, and Spectral ruleset selection.
 
