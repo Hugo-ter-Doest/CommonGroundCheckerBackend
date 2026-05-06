@@ -1,0 +1,64 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model RepoAnalysis {
+  id        String   @id @default(uuid())
+  repoId    String
+  repository Repo    @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  scoringConfigId String?
+  scoringConfig   ScoringConfig? @relation(fields: [scoringConfigId], references: [id], onDelete: SetNull)
+  checkedAt DateTime
+  version   String?
+  score     Int
+  results   Json
+  createdAt DateTime @default(now())
+
+  @@index([repoId])
+  @@index([scoringConfigId])
+  @@index([createdAt])
+}
+
+model Repo {
+  id        String         @id @default(uuid())
+  repoUrl   String         @unique
+  owner     String
+  name      String
+  description            String?
+  language               String?
+  stars                  Int      @default(0)
+  forks                  Int      @default(0)
+  defaultBranch          String?
+  topics                 String[] @default([])
+  license                String?
+  version                String?
+  versionEvidenceSource  String?
+  versionEvidenceDetail  String?
+  helmChartLocations       String[]
+  dockerLocations          String[]
+  apiSpecificationLocations String[]
+  documentationLocations   String[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  analyses  RepoAnalysis[]
+
+  @@index([owner])
+  @@index([name])
+}
+
+model ScoringConfig {
+  id                         String         @id @default(uuid())
+  criterionWeights           Json
+  criterionRequirementLevels Json           @default("{}")
+  complexityThreshold        Int            @default(15)
+  complexityMaxCcnThreshold  Int            @default(30)
+  spectralRulesetSource      String         @default("https://static.developer.overheid.nl/adr/ruleset.yaml")
+  createdAt                  DateTime       @default(now())
+  updatedAt                  DateTime       @updatedAt
+  analyses                   RepoAnalysis[]
+}

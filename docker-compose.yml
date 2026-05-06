@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: commonground_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cgchecker
+      POSTGRES_PASSWORD: cgchecker
+      POSTGRES_DB: cgchecker
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cgchecker-network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: commonground_app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://cgchecker:cgchecker@db:5432/cgchecker?schema=public
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    networks:
+      - cgchecker-network
+
+volumes:
+  postgres_data:
+
+networks:
+  cgchecker-network:
+    driver: bridge
