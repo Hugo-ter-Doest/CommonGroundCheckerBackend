@@ -16,11 +16,11 @@ services:
     networks:
       - cgchecker-network
 
-  app:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: commonground_app
+    container_name: commonground_api
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://cgchecker:cgchecker@db:5432/cgchecker?schema=public
