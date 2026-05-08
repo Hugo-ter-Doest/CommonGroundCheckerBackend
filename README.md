@@ -34,8 +34,6 @@ The backend is structured into the following layers:
 | `GET` | `/api/repositories/export` | Export repository analysis history as CSV |
 | `POST` | `/api/repositories` | Create or update repository metadata |
 | `POST` | `/api/repositories/{repoId}/analyses` | Persist a new analysis result for an existing repository |
-| `POST` | `/api/check` | Run a full repository analysis and persist the report |
-| `POST` | `/api/check/stream` | Stream progress events during analysis |
 | `GET` | `/api/admin/scoring` | Retrieve the current scoring configuration snapshot |
 | `POST` | `/api/admin/scoring` | Save a new scoring configuration snapshot |
 | `GET` | `/api/repo-history` | Retrieve analysis history for a repository by owner/repo |
@@ -43,7 +41,6 @@ The backend is structured into the following layers:
 ### Request/response shape
 
 - `/api/repositories` expects JSON metadata containing `repoUrl` and optional repository fields.
-- `/api/check` and `/api/check/stream` expect JSON analysis request payloads and return repository scoring results.
 - The literal OpenAPI specification is stored in `src/app/api/openapi/openapi.yaml` and served by `/api/openapi`.
 - `/api/repositories/{repoId}/analyses` expects analysis result payloads including `checkedAt`, `score`, and `results`.
 - `/api/admin/scoring` exposes and persists custom scoring parameters for criterion weights, complexity thresholds, and Spectral ruleset selection.
