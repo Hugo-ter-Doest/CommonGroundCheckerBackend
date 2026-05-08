@@ -1,0 +1,19 @@
+title = "Common Ground Checker Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Ignore generated or vendor-like folders"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)\.next/''',
+  '''(^|/)coverage/''',
+  '''(^|/)badges/'''
+]
+
+[[allowlists]]
+description = "Ignore environment example templates"
+paths = [
+  '''(^|/)\.env\.local\.example$'''
+]
