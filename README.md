@@ -155,5 +155,7 @@ npm test
 ## License
 
 This project is licensed under the EUPL-1.2 license.
+
 (C) VNG Realisatie
+
 Author: Hugo W.L. ter Doest
