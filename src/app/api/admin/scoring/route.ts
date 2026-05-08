@@ -6,7 +6,7 @@ import {
   DEFAULT_SPECTRAL_RULESET_SOURCE,
   getScoringConfig,
   saveCriterionWeights,
-} from "@/lib/checkers/config";
+} from "@/lib/scoring";
 
 type ScoringRouteBody = {
   reset?: boolean;

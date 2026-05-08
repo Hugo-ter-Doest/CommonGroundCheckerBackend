@@ -1,5 +1,5 @@
-import type { CheckStatus, RequirementLevel } from "../types";
-import { prisma } from "../db";
+import type { CheckStatus, RequirementLevel } from "./types";
+import { prisma } from "./db";
 
 export interface CriterionConfig {
   weight: number;

@@ -6,8 +6,6 @@ import { registerRepoHistoryRoute } from "./app/api/repo-history/route";
 import { registerRepositoriesExportRoute } from "./app/api/repositories/export/route";
 import { registerOpenApiRoute } from "./app/api/openapi/route";
 import { registerAdminScoringRoute } from "./app/api/admin/scoring/route";
-import { registerCheckRoute } from "./app/api/check/route";
-import { registerCheckStreamRoute } from "./app/api/check/stream/route";
 
 export function buildServer() {
   const app = Fastify({ logger: true });
@@ -18,8 +16,6 @@ export function buildServer() {
   app.register(registerRepoHistoryRoute);
   app.register(registerOpenApiRoute);
   app.register(registerAdminScoringRoute);
-  app.register(registerCheckRoute);
-  app.register(registerCheckStreamRoute);
 
   app.setNotFoundHandler((request, reply) => {
     reply.status(404).send({ error: "Not found" });
