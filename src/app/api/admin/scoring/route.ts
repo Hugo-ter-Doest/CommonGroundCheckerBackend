@@ -85,7 +85,7 @@ function extractSpectralRulesetSourceFromPayload(
   return value;
 }
 
-export async function registerAdminScoringRoute(fastify: FastifyInstance) {
+export function registerAdminScoringRoute(fastify: FastifyInstance) {
   fastify.get("/api/admin/scoring", async (request, reply) => {
     try {
       const scoringConfig = await getScoringConfig();
