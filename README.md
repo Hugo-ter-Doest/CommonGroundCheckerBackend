@@ -20,7 +20,6 @@ The backend is structured into the following layers:
 - `src/app/api/*` � API route modules that define request handling and response shaping
 - `src/lib/db.ts` � Prisma client singleton and database connection
 - `src/lib/github.ts` � GitHub REST API client used by checkers
-- `src/lib/checkers` � domain checkers and analysis orchestration logic
 - `prisma/schema.prisma` � database model definitions for repositories, analyses, and scoring configuration
 
 ## API
