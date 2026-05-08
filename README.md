@@ -106,18 +106,36 @@ The backend will start on port `3000` by default.
 - Tests: `npm test`
 - Watch tests: `npm run test:watch`
 
-## Docker
+## Docker Compose
 
-Build the production image with:
+Start the database and the API server together using Docker Compose:
 
 ```bash
-docker build -t common-ground-checker-backend .
+docker compose up -d --build
 ```
 
-Run it with:
+This will:
+
+- build the API image
+- start the `db` service with Postgres
+- start the `api` service connected to the database
+
+To stop the services without removing data:
 
 ```bash
-docker run -p 3000:3000 --env-file .env common-ground-checker-backend
+docker compose down
+```
+
+To remove containers and network but keep the database volume:
+
+```bash
+docker compose down
+```
+
+To remove the database data as well, use:
+
+```bash
+docker compose down -v
 ```
 
 ## Testing
