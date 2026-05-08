@@ -1,5 +1,11 @@
 # Common Ground Checker Backend
 
+<p>
+	<img src="./public/icons/Common_gound_logo_rgb.svg" alt="Common Ground" height="20" />
+	<img src="./badges/coverage.svg" alt="Coverage" height="20" />
+	<img src="./badges/vulnerabilities.svg" alt="Vulnerabilities" height="20" />
+</p>
+
 A Fastify-based backend for repository analysis, Common Ground compliance checking, and analysis result storage.
 
 This repository provides the backend service for the Common Ground Checker application. It exposes REST APIs for repository metadata, analysis runs, scoring configuration, history retrieval, and CSV export.
