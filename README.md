@@ -24,11 +24,16 @@ The backend is structured into the following layers:
 
 ## API
 
+The API supports three types of resources:
+- Repositories: metadata of repository that have been analysed at least once
+- Repository Analyses: all analysis jobs that have been performed in te past.
+- Scoring: the settings with wich scores have been calculated. Each repository analysis has a reference to a Scoring. 
+
 ### Supported endpoints
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/openapi` | Retrieve the generated OpenAPI specification |
+| `GET` | `/api/openapi` | Retrieve the OpenAPI specification |
 | `GET` | `/api/repositories` | List known repositories and their latest summary |
 | `GET` | `/api/repositories/export` | Export repository analysis history as CSV |
 | `POST` | `/api/repositories` | Create or update repository metadata |
