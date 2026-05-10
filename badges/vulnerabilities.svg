@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="220" height="20" role="img" aria-label="vulnerabilities: total:2 h:0 c:0">
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="20" role="img" aria-label="vulnerabilities: total:3 h:0 c:0">
   <linearGradient id="smooth" x2="0" y2="100%">
     <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
     <stop offset="1" stop-opacity=".1"/>
@@ -15,7 +15,7 @@
   <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="11">
     <text x="47.5" y="15" fill="#010101" fill-opacity=".3">vulnerabilities</text>
     <text x="47.5" y="14">vulnerabilities</text>
-    <text x="157.5" y="15" fill="#010101" fill-opacity=".3">total:2 h:0 c:0</text>
-    <text x="157.5" y="14">total:2 h:0 c:0</text>
+    <text x="157.5" y="15" fill="#010101" fill-opacity=".3">total:3 h:0 c:0</text>
+    <text x="157.5" y="14">total:3 h:0 c:0</text>
   </g>
 </svg>
