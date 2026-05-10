@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@/lib/db";
 
-export async function registerRepoAnalysesRoute(fastify: FastifyInstance) {
+export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
   fastify.post(
     "/api/repositories/:repoId/analyses",
     async (request, reply) => {

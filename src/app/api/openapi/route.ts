@@ -7,5 +7,5 @@ const openApiSpec = load(
 ) as Record<string, unknown>;
 
 export function registerOpenApiRoute(fastify: FastifyInstance) {
-  fastify.get("/api/openapi", async () => openApiSpec);
+  fastify.get("/api/openapi", () => openApiSpec);
 }

@@ -6,7 +6,13 @@ function escapeCsvCell(value: unknown): string {
     return "";
   }
 
-  const text = String(value);
+  const text =
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+      ? String(value)
+      : JSON.stringify(value);
+
   if (/[",\r\n]/.test(text)) {
     return `"${text.replace(/"/g, '""')}"`;
   }
@@ -28,8 +34,13 @@ function normalizeResults(raw: unknown): NormalizedResult[] {
 
   return raw
     .filter(
-      (item): item is Record<string, unknown> =>
-        item !== null && typeof item === "object" && typeof item.id === "string"
+      (item): item is Record<string, unknown> => {
+        return (
+          item !== null &&
+          typeof item === "object" &&
+          typeof (item as Record<string, unknown>).id === "string"
+        );
+      }
     )
     .map((item) => ({
       id: String(item.id),
@@ -39,7 +50,7 @@ function normalizeResults(raw: unknown): NormalizedResult[] {
     }));
 }
 
-export async function registerRepositoriesExportRoute(fastify: FastifyInstance) {
+export function registerRepositoriesExportRoute(fastify: FastifyInstance) {
   fastify.get("/api/repositories/export", async (request, reply) => {
     const repositories = await prisma.repo.findMany({
       orderBy: [{ owner: "asc" }, { name: "asc" }],
@@ -61,19 +72,23 @@ export async function registerRepositoriesExportRoute(fastify: FastifyInstance) 
     });
 
     const resultIds = new Set<string>();
-    const rows = repositories
-      .filter((repository) => repository.analyses[0] !== undefined)
-      .map((repository) => {
-        const latestAnalysis = repository.analyses[0]!;
-        const results = normalizeResults(latestAnalysis.results);
-        results.forEach((result) => resultIds.add(result.id));
+    const rows = repositories.flatMap((repository) => {
+      const latestAnalysis = repository.analyses[0];
+      if (!latestAnalysis) {
+        return [];
+      }
 
-        return {
+      const results = normalizeResults(latestAnalysis.results);
+      results.forEach((result) => resultIds.add(result.id));
+
+      return [
+        {
           repository,
           latestAnalysis,
           results,
-        };
-      });
+        },
+      ];
+    });
 
     const sortedResultIds = Array.from(resultIds).sort();
     const resultHeaders = sortedResultIds.flatMap((id) => [

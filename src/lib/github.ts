@@ -42,7 +42,7 @@ function headers() {
   return h;
 }
 
-async function ghFetch(path: string) {
+async function ghFetch<T = unknown>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: headers(),
   });
@@ -50,7 +50,8 @@ async function ghFetch(path: string) {
     const body = await res.text();
     throw new Error(`GitHub API ${res.status}: ${body.slice(0, 200)}`);
   }
-  return res.json();
+  const body = (await res.json()) as unknown;
+  return body as T;
 }
 
 function extractVersionFromReadme(content: string): string | null {
@@ -151,17 +152,30 @@ function extractVersionFromChartYaml(content: string): string | null {
   return normalizeVersion(match[1]);
 }
 
+function parseDateString(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return "1970-01-01T00:00:00Z";
+}
+
 /** Flat list of all file paths in the repo tree (up to 100k nodes). */
 export async function getRepoTree(
   owner: string,
   repo: string,
   branch: string
 ): Promise<string[]> {
-  const data = await ghFetch(
+  const data = await ghFetch<{ tree?: Array<{ path?: string }> }>(
     `/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`
   );
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data.tree ?? []).map((n: any) => n.path as string);
+
+  const tree = Array.isArray(data.tree) ? data.tree : [];
+  return tree
+    .map((node) => (typeof node.path === "string" ? node.path : ""))
+    .filter((path): path is string => path.length > 0);
 }
 
 /** Fetch raw file content as text (base64-decoded). Returns null if not found. */
@@ -171,11 +185,17 @@ export async function getFileContent(
   path: string
 ): Promise<string | null> {
   try {
-    const data = await ghFetch(`/repos/${owner}/${repo}/contents/${path}`);
-    if (data.encoding === "base64") {
-      return Buffer.from(data.content, "base64").toString("utf-8");
+    const data = await ghFetch<{
+      encoding?: string;
+      content?: string;
+    }>(`/repos/${owner}/${repo}/contents/${path}`);
+
+    const fileContent = data.content;
+    if (data.encoding === "base64" && typeof fileContent === "string") {
+      return Buffer.from(fileContent, "base64").toString("utf-8");
     }
-    return data.content ?? null;
+
+    return typeof data.content === "string" ? data.content : null;
   } catch {
     return null;
   }
@@ -187,12 +207,27 @@ export async function getRepoMeta(owner: string, repo: string) {
 }
 
 /** Fetch latest repository version (release tag or latest git tag). */
+type ReleaseLatestResponse = {
+  tag_name?: unknown;
+};
+
+type ReleaseLike = {
+  tag_name?: unknown;
+  name?: unknown;
+  draft?: unknown;
+  prerelease?: unknown;
+  published_at?: unknown;
+  created_at?: unknown;
+};
+
 export async function getRepoVersion(
   owner: string,
   repo: string
 ): Promise<RepoVersionResult> {
   try {
-    const latestRelease = await ghFetch(`/repos/${owner}/${repo}/releases/latest`);
+    const latestRelease = await ghFetch<ReleaseLatestResponse>(
+      `/repos/${owner}/${repo}/releases/latest`
+    );
     const latestTag =
       typeof latestRelease?.tag_name === "string"
         ? latestRelease.tag_name.trim()
@@ -211,21 +246,14 @@ export async function getRepoVersion(
   }
 
   try {
-    const releases = await ghFetch(`/repos/${owner}/${repo}/releases?per_page=20`);
+    const releases = await ghFetch<ReleaseLike[]>(
+      `/repos/${owner}/${repo}/releases?per_page=20`
+    );
     if (Array.isArray(releases) && releases.length > 0) {
-
-      type ReleaseLike = {
-        tag_name?: unknown;
-        name?: unknown;
-        draft?: unknown;
-        prerelease?: unknown;
-        published_at?: unknown;
-        created_at?: unknown;
-      };
-
       const normalized = releases
-        .map((entry) => entry as ReleaseLike)
-        .filter((entry) => entry?.draft !== true);
+        .filter((entry): entry is ReleaseLike =>
+          entry !== null && typeof entry === "object" && entry.draft !== true
+        );
 
       const stable = normalized.filter((entry) => entry?.prerelease !== true);
       const pool = stable.length > 0 ? stable : normalized;
@@ -233,10 +261,10 @@ export async function getRepoVersion(
       if (pool.length > 0) {
         const sorted = [...pool].sort((a, b) => {
           const aDate = Date.parse(
-            String(a.published_at ?? a.created_at ?? "1970-01-01T00:00:00Z")
+            parseDateString(a.published_at ?? a.created_at)
           );
           const bDate = Date.parse(
-            String(b.published_at ?? b.created_at ?? "1970-01-01T00:00:00Z")
+            parseDateString(b.published_at ?? b.created_at)
           );
           return bDate - aDate;
         });

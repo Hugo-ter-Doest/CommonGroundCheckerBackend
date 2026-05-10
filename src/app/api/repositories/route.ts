@@ -8,7 +8,7 @@ function normalizeStringArray(value: unknown): string[] {
     : [];
 }
 
-export async function registerRepositoriesRoutes(fastify: FastifyInstance) {
+export function registerRepositoriesRoutes(fastify: FastifyInstance) {
   fastify.get("/api/repositories", async (request, reply) => {
     try {
       const query = request.query as { limit?: string };

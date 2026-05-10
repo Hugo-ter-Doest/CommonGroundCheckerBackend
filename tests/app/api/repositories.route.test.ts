@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import Fastify from "fastify";
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -19,6 +18,48 @@ vi.mock("@/lib/db", () => ({
 import { prisma } from "@/lib/db";
 import { buildServer } from "@/server";
 
+type MockPrisma = {
+  repo: {
+    upsert: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+    findMany: ReturnType<typeof vi.fn>;
+    findFirst: ReturnType<typeof vi.fn>;
+  };
+  repoAnalysis: {
+    create: ReturnType<typeof vi.fn>;
+  };
+  $disconnect: ReturnType<typeof vi.fn>;
+};
+
+const mockedPrisma = prisma as unknown as MockPrisma;
+
+type OpenApiResponse = {
+  openapi: string;
+  paths: Record<string, unknown>;
+};
+
+type ErrorResponse = { error: string };
+
+type RepoPostResponse = {
+  id: string;
+  owner: string;
+  name: string;
+  repoUrl: string;
+  analysisCount: number;
+  latestAnalysis: { checkedAt: string; score: number };
+};
+
+type AnalysisResponse = {
+  id: string;
+  repoId: string;
+  scoringConfigId: string | null;
+  checkedAt: string;
+  version: string | null;
+  score: number;
+  results: unknown[];
+  createdAt: string;
+};
+
 let app: ReturnType<typeof buildServer>;
 
 beforeEach(() => {
@@ -37,7 +78,7 @@ describe("API route tests", () => {
       const response = await app.inject({ method: "GET", url: "/api/openapi" });
       expect(response.statusCode).toBe(200);
 
-      const body = JSON.parse(response.payload);
+      const body = JSON.parse(response.payload) as OpenApiResponse;
       expect(body).toHaveProperty("openapi", "3.1.0");
       expect(body).toHaveProperty("paths");
       expect(body.paths).toHaveProperty("/api/repositories");
@@ -61,7 +102,7 @@ describe("API route tests", () => {
         _count: { analyses: 1 },
         analyses: [{ checkedAt: new Date("2026-05-06T00:00:00Z"), score: 42 }],
       };
-      (prisma.repo.upsert as ReturnType<typeof vi.fn>).mockResolvedValue(mockRepo);
+      mockedPrisma.repo.upsert.mockResolvedValue(mockRepo);
 
       const response = await app.inject({
         method: "POST",
@@ -71,10 +112,10 @@ describe("API route tests", () => {
           description: "A sample repository",
         },
       });
-      expect(prisma.repo.upsert).toHaveBeenCalled();
+      expect(mockedPrisma.repo.upsert).toHaveBeenCalled();
       expect(response.statusCode).toBe(200);
 
-      const body = JSON.parse(response.payload);
+      const body = JSON.parse(response.payload) as RepoPostResponse;
       expect(body).toMatchObject({
         id: "repo-id",
         owner: "example",
@@ -96,7 +137,7 @@ describe("API route tests", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      const body = JSON.parse(response.payload);
+      const body = JSON.parse(response.payload) as ErrorResponse;
       expect(body).toEqual({ error: "Missing required field: repoUrl" });
     });
 
@@ -108,14 +149,14 @@ describe("API route tests", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      const body = JSON.parse(response.payload);
+      const body = JSON.parse(response.payload) as ErrorResponse;
       expect(body.error).toContain("Invalid GitHub URL");
     });
   });
 
   describe("POST /api/repositories/{repoId}/analyses", () => {
     it("returns 404 when the repository does not exist", async () => {
-      (prisma.repo.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+      mockedPrisma.repo.findUnique.mockResolvedValue(null);
 
       const response = await app.inject({
         method: "POST",
@@ -127,9 +168,9 @@ describe("API route tests", () => {
         },
       });
 
-      expect(prisma.repo.findUnique).toHaveBeenCalledWith({ where: { id: "missing-repo" } });
+      expect(mockedPrisma.repo.findUnique).toHaveBeenCalledWith({ where: { id: "missing-repo" } });
       expect(response.statusCode).toBe(404);
-      const body = JSON.parse(response.payload);
+      const body = JSON.parse(response.payload) as ErrorResponse;
       expect(body).toEqual({ error: "Repository not found." });
     });
 
@@ -147,7 +188,7 @@ describe("API route tests", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      const body = JSON.parse(response.payload);
+      const body = JSON.parse(response.payload) as ErrorResponse;
       expect(body.error).toContain("Missing or invalid checkedAt field.");
     });
 
@@ -175,7 +216,7 @@ describe("API route tests", () => {
         },
       });
 
-      expect(prisma.repoAnalysis.create).toHaveBeenCalledWith({
+      expect(mockedPrisma.repoAnalysis.create).toHaveBeenCalledWith({
         data: {
           repoId: "repo-id",
           scoringConfigId: null,
@@ -187,7 +228,7 @@ describe("API route tests", () => {
       });
       expect(response.statusCode).toBe(201);
 
-      const body = JSON.parse(response.payload);
+      const body = JSON.parse(response.payload) as AnalysisResponse;
       expect(body).toEqual({
         id: "analysis-id",
         repoId: "repo-id",
