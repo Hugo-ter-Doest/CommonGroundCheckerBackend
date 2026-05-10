@@ -203,7 +203,7 @@ export async function getFileContent(
 
 /** Fetch repository metadata. */
 export async function getRepoMeta(owner: string, repo: string) {
-  return ghFetch(`/repos/${owner}/${repo}`);
+  return ghFetch<{ default_branch?: string }>(`/repos/${owner}/${repo}`);
 }
 
 /** Fetch latest repository version (release tag or latest git tag). */
