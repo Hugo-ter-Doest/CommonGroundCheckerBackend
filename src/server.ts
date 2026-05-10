@@ -35,7 +35,10 @@ export function buildServer() {
   });
 
   app.addHook("onClose", async () => {
-    await prisma.$disconnect();
+    const disconnect = (prisma as unknown as { $disconnect?: unknown }).$disconnect;
+    if (typeof disconnect === "function") {
+      await disconnect.call(prisma);
+    }
   });
 
   return app;

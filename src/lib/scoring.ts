@@ -190,11 +190,20 @@ function parseOverridesFromDbPayload(payload: unknown): ScoringConfigOverrides {
   };
 }
 
+type ScoringConfigDbRow = {
+  id: string;
+  criterionWeights: unknown;
+  criterionRequirementLevels: unknown;
+  complexityThreshold: number | null;
+  complexityMaxCcnThreshold: number | null;
+  spectralRulesetSource: string | null;
+};
+
 async function readLatestDbOverrides(): Promise<{
   id: string;
   overrides: ScoringConfigOverrides;
 } | null> {
-  const row = await prisma.scoringConfig.findFirst({
+  const row = (await prisma.scoringConfig.findFirst({
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -204,7 +213,7 @@ async function readLatestDbOverrides(): Promise<{
       complexityMaxCcnThreshold: true,
       spectralRulesetSource: true,
     },
-  });
+  })) as ScoringConfigDbRow | null;
 
   if (!row) return null;
 
@@ -223,7 +232,7 @@ async function readLatestDbOverrides(): Promise<{
 async function createDbOverridesRecord(
   overrides: ScoringConfigOverrides
 ): Promise<string> {
-  const created = await prisma.scoringConfig.create({
+  const created = (await prisma.scoringConfig.create({
     data: {
       criterionWeights: overrides.criterionWeights ?? {},
       criterionRequirementLevels: overrides.criterionRequirementLevels ?? {},
@@ -238,7 +247,7 @@ async function createDbOverridesRecord(
         overrides.spectralRulesetSource
       ),
     },
-  });
+  })) as { id: string };
 
   return created.id;
 }

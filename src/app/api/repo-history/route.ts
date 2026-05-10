@@ -1,6 +1,25 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/db";
+
+type RepoHistoryRepository = {
+  id: string;
+  repoUrl: string;
+  owner: string;
+  name: string;
+  description: string | null;
+  language: string | null;
+  stars: number | null;
+  forks: number | null;
+  defaultBranch: string | null;
+  topics: string[];
+  license: string | null;
+  version: string | null;
+  versionEvidenceSource: string | null;
+  versionEvidenceDetail: string | null;
+  createdAt: string;
+  updatedAt: string;
+  analyses: Array<{ checkedAt: Date; score: number }>;
+};
 
 export function registerRepoHistoryRoute(fastify: FastifyInstance) {
   fastify.get(
@@ -24,9 +43,7 @@ export function registerRepoHistoryRoute(fastify: FastifyInstance) {
           ? Math.max(1, Math.min(200, parsedLimit))
           : 50;
 
-        const repository: Prisma.RepoGetPayload<{
-          include: { analyses: true };
-        }> | null = await prisma.repo.findFirst({
+        const repository = (await prisma.repo.findFirst({
           where: { owner, name: repo },
           include: {
             analyses: {
@@ -34,7 +51,7 @@ export function registerRepoHistoryRoute(fastify: FastifyInstance) {
               take: limit,
             },
           },
-        });
+        })) as RepoHistoryRepository | null;
 
         if (!repository) {
           return reply
@@ -42,8 +59,8 @@ export function registerRepoHistoryRoute(fastify: FastifyInstance) {
             .send({ error: "Repository not found in analysis history." });
         }
 
-      const repoMeta = {
-        description: repository.description,
+        const repoMeta = {
+          description: repository.description,
         language: repository.language,
         stars: repository.stars,
         forks: repository.forks,

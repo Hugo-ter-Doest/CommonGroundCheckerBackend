@@ -175,7 +175,7 @@ describe("API route tests", () => {
     });
 
     it("returns 400 when the payload is invalid", async () => {
-      (prisma.repo.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "repo-id" });
+      mockedPrisma.repo.findUnique.mockResolvedValue({ id: "repo-id" });
 
       const response = await app.inject({
         method: "POST",
@@ -193,7 +193,7 @@ describe("API route tests", () => {
     });
 
     it("creates a new analysis result for an existing repository", async () => {
-      (prisma.repo.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "repo-id" });
+      mockedPrisma.repo.findUnique.mockResolvedValue({ id: "repo-id" });
       const mockAnalysis = {
         id: "analysis-id",
         repoId: "repo-id",
@@ -204,7 +204,7 @@ describe("API route tests", () => {
         results: [],
         createdAt: new Date("2026-05-06T00:00:00Z"),
       };
-      (prisma.repoAnalysis.create as ReturnType<typeof vi.fn>).mockResolvedValue(mockAnalysis);
+      mockedPrisma.repoAnalysis.create.mockResolvedValue(mockAnalysis);
 
       const response = await app.inject({
         method: "POST",
