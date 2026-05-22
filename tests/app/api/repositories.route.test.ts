@@ -129,6 +129,47 @@ describe("API route tests", () => {
       });
     });
 
+    it("creates or updates repository metadata with a valid GitLab repoUrl", async () => {
+      const mockRepo = {
+        id: "repo-id",
+        owner: "rinis-oss/fsc",
+        name: "open-fsc",
+        repoUrl: "https://gitlab.com/rinis-oss/fsc/open-fsc",
+        helmChartLocations: [],
+        dockerLocations: [],
+        apiSpecificationLocations: [],
+        documentationLocations: [],
+        updatedAt: new Date("2026-05-06T00:00:00Z"),
+        _count: { analyses: 1 },
+        analyses: [{ checkedAt: new Date("2026-05-06T00:00:00Z"), score: 50 }],
+      };
+      mockedPrisma.repo.upsert.mockResolvedValue(mockRepo);
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/repositories",
+        payload: {
+          repoUrl: "https://gitlab.com/rinis-oss/fsc/open-fsc",
+          description: "OpenFSC is een open source peer-to-peer-systeem...",
+        },
+      });
+      expect(mockedPrisma.repo.upsert).toHaveBeenCalled();
+      expect(response.statusCode).toBe(200);
+
+      const body = JSON.parse(response.payload) as RepoPostResponse;
+      expect(body).toMatchObject({
+        id: "repo-id",
+        owner: "rinis-oss/fsc",
+        name: "open-fsc",
+        repoUrl: "https://gitlab.com/rinis-oss/fsc/open-fsc",
+        analysisCount: 1,
+      });
+      expect(body.latestAnalysis).toEqual({
+        checkedAt: mockRepo.analyses[0].checkedAt.toISOString(),
+        score: 50,
+      });
+    });
+
     it("returns 400 when repoUrl is missing", async () => {
       const response = await app.inject({
         method: "POST",
@@ -141,7 +182,7 @@ describe("API route tests", () => {
       expect(body).toEqual({ error: "Missing required field: repoUrl" });
     });
 
-    it("returns 400 for an invalid GitHub repoUrl", async () => {
+    it("returns 400 for an invalid GitHub or GitLab repoUrl", async () => {
       const response = await app.inject({
         method: "POST",
         url: "/api/repositories",
@@ -150,7 +191,7 @@ describe("API route tests", () => {
 
       expect(response.statusCode).toBe(400);
       const body = JSON.parse(response.payload) as ErrorResponse;
-      expect(body.error).toContain("Invalid GitHub URL");
+      expect(body.error).toContain("Invalid GitHub or GitLab URL");
     });
   });
 

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@/lib/db";
-import { parseGitHubUrl } from "@/lib/github";
+import { parseRepositoryUrl } from "@/lib/repo";
 
 function normalizeStringArray(value: unknown): string[] {
   return Array.isArray(value)
@@ -70,11 +70,11 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({ error: "Missing required field: repoUrl" });
       }
 
-      const parsed = parseGitHubUrl(repoUrl);
+      const parsed = parseRepositoryUrl(repoUrl);
       if (!parsed) {
         return reply.status(400).send({
           error:
-            "Invalid GitHub URL. Please provide a URL like https://github.com/owner/repo",
+            "Invalid GitHub or GitLab URL. Please provide a URL like https://github.com/owner/repo or https://gitlab.com/group/project",
         });
       }
 
