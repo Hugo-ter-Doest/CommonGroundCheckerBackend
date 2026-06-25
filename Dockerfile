@@ -19,6 +19,7 @@ ENV HOSTNAME=0.0.0.0
 COPY package*.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/prisma ./prisma
 
