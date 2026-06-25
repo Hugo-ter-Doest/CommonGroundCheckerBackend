@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
+  DEFAULT_CATEGORY_WEIGHTS,
   DEFAULT_COMPLEXITY_MAX_CCN_THRESHOLD,
   DEFAULT_COMPLEXITY_THRESHOLD,
   DEFAULT_CRITERION_CONFIG_BY_CHECK_ID,
@@ -14,6 +15,7 @@ type ScoringRouteBody = {
   complexityMaxCcnThreshold?: number;
   spectralRulesetSource?: string;
   criterionWeights?: unknown;
+  categoryWeights?: unknown;
   criterionRequirementLevels?: unknown;
 };
 
@@ -51,6 +53,21 @@ function extractRequirementLevelsFromPayload(payload: unknown): Record<string, s
     const value = raw[checkId];
     if (value === "mandatory" || value === "recommended") {
       result[checkId] = value;
+    }
+  }
+
+  return result;
+}
+
+function extractCategoryWeightsFromPayload(payload: unknown): Record<string, number> {
+  if (!payload || typeof payload !== "object") return {};
+
+  const raw = payload as Record<string, unknown>;
+  const result: Record<string, number> = {};
+
+  for (const [category, value] of Object.entries(raw)) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      result[category] = value;
     }
   }
 
@@ -97,6 +114,7 @@ export function registerAdminScoringRoute(fastify: FastifyInstance) {
             config.weight,
           ])
         ),
+        categoryWeights: scoringConfig.categoryWeights,
         criterionRequirementLevels: Object.fromEntries(
           Object.entries(scoringConfig.criterionConfigByCheckId).map(([checkId, config]) => [
             checkId,
@@ -112,6 +130,7 @@ export function registerAdminScoringRoute(fastify: FastifyInstance) {
             config.weight,
           ])
         ),
+        defaultCategoryWeights: { ...DEFAULT_CATEGORY_WEIGHTS },
         defaultCriterionRequirementLevels: Object.fromEntries(
           Object.entries(DEFAULT_CRITERION_CONFIG_BY_CHECK_ID).map(([checkId, config]) => [
             checkId,
@@ -140,6 +159,7 @@ export function registerAdminScoringRoute(fastify: FastifyInstance) {
         const incomingThreshold = extractComplexityThresholdFromPayload(body);
         const incomingMaxThreshold = extractComplexityMaxCcnThresholdFromPayload(body);
         const incomingSpectralRulesetSource = extractSpectralRulesetSourceFromPayload(body);
+        const incomingCategoryWeights = extractCategoryWeightsFromPayload(body?.categoryWeights);
 
         const activeConfig = reset
           ? await saveCriterionWeights(
@@ -147,6 +167,7 @@ export function registerAdminScoringRoute(fastify: FastifyInstance) {
               DEFAULT_COMPLEXITY_THRESHOLD,
               DEFAULT_COMPLEXITY_MAX_CCN_THRESHOLD,
               {},
+              undefined,
               DEFAULT_SPECTRAL_RULESET_SOURCE
             )
           : await saveCriterionWeights(
@@ -154,6 +175,7 @@ export function registerAdminScoringRoute(fastify: FastifyInstance) {
               incomingThreshold,
               incomingMaxThreshold,
               extractRequirementLevelsFromPayload(body?.criterionRequirementLevels),
+              incomingCategoryWeights,
               incomingSpectralRulesetSource
             );
 
@@ -170,6 +192,7 @@ export function registerAdminScoringRoute(fastify: FastifyInstance) {
               config.weight,
             ])
           ),
+          categoryWeights: activeConfig.config.categoryWeights,
           criterionRequirementLevels: Object.fromEntries(
             Object.entries(activeConfig.config.criterionConfigByCheckId).map(([checkId, config]) => [
               checkId,

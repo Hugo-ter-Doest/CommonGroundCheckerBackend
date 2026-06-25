@@ -161,6 +161,10 @@ paths:
                   type: object
                   additionalProperties:
                     type: number
+                categoryWeights:
+                  type: object
+                  additionalProperties:
+                    type: number
                 criterionRequirementLevels:
                   type: object
                   additionalProperties:
@@ -428,6 +432,10 @@ components:
           type: object
           additionalProperties:
             type: number
+        categoryWeights:
+          type: object
+          additionalProperties:
+            type: number
         criterionRequirementLevels:
           type: object
           additionalProperties:
@@ -436,6 +444,10 @@ components:
               - mandatory
               - recommended
         defaultCriterionWeights:
+          type: object
+          additionalProperties:
+            type: number
+        defaultCategoryWeights:
           type: object
           additionalProperties:
             type: number
@@ -459,8 +471,10 @@ components:
         - complexityMaxCcnThreshold
         - spectralRulesetSource
         - criterionWeights
+        - categoryWeights
         - criterionRequirementLevels
         - defaultCriterionWeights
+        - defaultCategoryWeights
         - defaultCriterionRequirementLevels
         - defaultComplexityThreshold
         - defaultComplexityMaxCcnThreshold

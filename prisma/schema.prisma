@@ -54,6 +54,7 @@ model Repo {
 model ScoringConfig {
   id                         String         @id @default(uuid())
   criterionWeights           Json
+  categoryWeights            Json           @default("{}")
   criterionRequirementLevels Json           @default("{}")
   complexityThreshold        Int            @default(15)
   complexityMaxCcnThreshold  Int            @default(30)

@@ -9,6 +9,7 @@ export interface CriterionConfig {
 interface ScoringConfigOverrides {
   criterionWeights?: Record<string, number>;
   criterionRequirementLevels?: Record<string, RequirementLevel>;
+  categoryWeights?: Record<string, number>;
   complexityThreshold?: number;
   complexityMaxCcnThreshold?: number;
   spectralRulesetSource?: string;
@@ -16,6 +17,7 @@ interface ScoringConfigOverrides {
 
 export interface ScoringConfig {
   criterionConfigByCheckId: Record<string, CriterionConfig>;
+  categoryWeights: Record<string, number>;
   statusScoreByStatus: Record<CheckStatus, number>;
   complexityThreshold: number;
   complexityMaxCcnThreshold: number;
@@ -38,6 +40,14 @@ export const DEFAULT_COMPLEXITY_THRESHOLD = 15;
 export const DEFAULT_COMPLEXITY_MAX_CCN_THRESHOLD = 30;
 export const DEFAULT_SPECTRAL_RULESET_SOURCE =
   "https://static.developer.overheid.nl/adr/ruleset.yaml";
+
+export const DEFAULT_CATEGORY_WEIGHTS: Record<string, number> = {
+  Governance: 0.2,
+  Architecture: 0.2,
+  Security: 0,
+  "Deployment & Operations": 0.2,
+  "Software Quality": 0.15,
+};
 
 export const DEFAULT_CRITERION_CONFIG_BY_CHECK_ID: Record<string, CriterionConfig> = {
   sourcecode: { weight: 1, requirementLevel: "mandatory" },
@@ -118,8 +128,19 @@ function buildScoringConfig(overrides?: ScoringConfigOverrides): ScoringConfig {
       })
     );
 
+  const categoryWeights: Record<string, number> = { ...DEFAULT_CATEGORY_WEIGHTS };
+
+  if (overrides?.categoryWeights) {
+    for (const [category, weight] of Object.entries(overrides.categoryWeights)) {
+      if (typeof weight === "number" && Number.isFinite(weight)) {
+        categoryWeights[category] = clampWeight(weight);
+      }
+    }
+  }
+
   return {
     criterionConfigByCheckId,
+    categoryWeights,
     statusScoreByStatus: { ...DEFAULT_STATUS_SCORE_BY_STATUS },
     complexityThreshold:
       typeof overrides?.complexityThreshold === "number"
@@ -157,6 +178,18 @@ function parseOverridesFromDbPayload(payload: unknown): ScoringConfigOverrides {
     }
   }
 
+  const categoryWeights: Record<string, number> = {};
+  const categoryWeightsRaw = candidate.categoryWeights;
+  if (categoryWeightsRaw && typeof categoryWeightsRaw === "object") {
+    for (const [category, weight] of Object.entries(
+      categoryWeightsRaw as Record<string, unknown>
+    )) {
+      if (typeof weight === "number" && Number.isFinite(weight)) {
+        categoryWeights[category] = weight;
+      }
+    }
+  }
+
   const criterionRequirementLevels: Record<string, RequirementLevel> = {};
   if (criterionRequirementLevelsRaw && typeof criterionRequirementLevelsRaw === "object") {
     for (const [checkId, level] of Object.entries(
@@ -174,6 +207,7 @@ function parseOverridesFromDbPayload(payload: unknown): ScoringConfigOverrides {
 
   return {
     criterionWeights,
+    categoryWeights: Object.keys(categoryWeights).length > 0 ? categoryWeights : undefined,
     criterionRequirementLevels: Object.keys(criterionRequirementLevels).length > 0 ? criterionRequirementLevels : undefined,
     complexityThreshold:
       typeof complexityThresholdRaw === "number"
@@ -193,6 +227,7 @@ function parseOverridesFromDbPayload(payload: unknown): ScoringConfigOverrides {
 type ScoringConfigDbRow = {
   id: string;
   criterionWeights: unknown;
+  categoryWeights: unknown;
   criterionRequirementLevels: unknown;
   complexityThreshold: number | null;
   complexityMaxCcnThreshold: number | null;
@@ -208,6 +243,7 @@ async function readLatestDbOverrides(): Promise<{
     select: {
       id: true,
       criterionWeights: true,
+      categoryWeights: true,
       criterionRequirementLevels: true,
       complexityThreshold: true,
       complexityMaxCcnThreshold: true,
@@ -221,6 +257,7 @@ async function readLatestDbOverrides(): Promise<{
     id: row.id,
     overrides: parseOverridesFromDbPayload({
       criterionWeights: row.criterionWeights,
+      categoryWeights: row.categoryWeights,
       criterionRequirementLevels: row.criterionRequirementLevels,
       complexityThreshold: row.complexityThreshold,
       complexityMaxCcnThreshold: row.complexityMaxCcnThreshold,
@@ -235,6 +272,7 @@ async function createDbOverridesRecord(
   const created = (await prisma.scoringConfig.create({
     data: {
       criterionWeights: overrides.criterionWeights ?? {},
+      categoryWeights: overrides.categoryWeights ?? {},
       criterionRequirementLevels: overrides.criterionRequirementLevels ?? {},
       complexityThreshold: clampComplexityThreshold(
         overrides.complexityThreshold ?? DEFAULT_COMPLEXITY_THRESHOLD
@@ -285,11 +323,13 @@ export async function saveCriterionWeights(
   complexityThreshold?: number,
   complexityMaxCcnThreshold?: number,
   criterionRequirementLevels?: Record<string, string>,
+  categoryWeights?: Record<string, number>,
   spectralRulesetSource?: string
 ): Promise<ActiveScoringConfig> {
   const overrides: ScoringConfigOverrides = {
     criterionWeights: {},
     criterionRequirementLevels: {},
+    categoryWeights,
     complexityThreshold:
       typeof complexityThreshold === "number"
         ? clampComplexityThreshold(complexityThreshold)
