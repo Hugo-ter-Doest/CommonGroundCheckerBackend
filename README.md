@@ -40,7 +40,7 @@ The API supports three types of resources:
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/api/openapi` | Retrieve the OpenAPI specification |
-| `GET` | `/api/repositories` | List known repositories and their latest summary |
+| `GET` | `/api/repositories` | List known repositories and their latest summary; optional `q` searches owner, name, description, URL and topics |
 | `GET` | `/api/repositories/export` | Export repository analysis history as CSV |
 | `POST` | `/api/repositories` | Create or update repository metadata |
 | `POST` | `/api/repositories/{repoId}/analyses` | Persist a new analysis result for an existing repository |

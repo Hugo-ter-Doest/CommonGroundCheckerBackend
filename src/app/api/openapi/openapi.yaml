@@ -30,6 +30,12 @@ paths:
             minimum: 1
             maximum: 50
             default: 12
+        - name: q
+          in: query
+          description: "Case-insensitive search term matched against owner, name, description and repository URL, and exactly (lowercased) against topics. Omit or leave blank to list all repositories."
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: "Repository summary list"

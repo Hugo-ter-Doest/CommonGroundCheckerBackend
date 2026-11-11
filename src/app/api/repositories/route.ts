@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import type { Prisma } from "@/generated/prisma";
 import { prisma } from "@/lib/db";
 import { parseRepositoryUrl } from "@/lib/repo";
 
@@ -8,16 +9,41 @@ function normalizeStringArray(value: unknown): string[] {
     : [];
 }
 
+/**
+ * Builds a case-insensitive filter on owner, name, description, repoUrl and
+ * topics. Topics are matched exactly against the lowercased term, because
+ * GitHub and GitLab store topics in lowercase. Returns undefined for an empty term.
+ */
+export function buildRepositorySearchWhere(
+  q: unknown
+): Prisma.RepoWhereInput | undefined {
+  const term = typeof q === "string" ? q.trim() : "";
+  if (!term) return undefined;
+
+  const contains = { contains: term, mode: "insensitive" as const };
+  return {
+    OR: [
+      { owner: contains },
+      { name: contains },
+      { description: contains },
+      { repoUrl: contains },
+      { topics: { has: term.toLowerCase() } },
+    ],
+  };
+}
+
 export function registerRepositoriesRoutes(fastify: FastifyInstance) {
   fastify.get("/api/repositories", async (request, reply) => {
     try {
-      const query = request.query as { limit?: string };
+      const query = request.query as { limit?: string; q?: string };
       const parsedLimit = Number(query.limit ?? "12");
       const limit = Number.isFinite(parsedLimit)
         ? Math.max(1, Math.min(50, parsedLimit))
         : 12;
+      const where = buildRepositorySearchWhere(query.q);
 
       const repositories = await prisma.repo.findMany({
+        ...(where ? { where } : {}),
         orderBy: { updatedAt: "desc" },
         take: limit,
         include: {

@@ -195,6 +195,65 @@ describe("API route tests", () => {
     });
   });
 
+  describe("GET /api/repositories", () => {
+    const listedRepo = {
+      id: "repo-id",
+      owner: "open-zaak",
+      name: "open-zaak",
+      repoUrl: "https://github.com/open-zaak/open-zaak",
+      helmChartLocations: [],
+      dockerLocations: [],
+      apiSpecificationLocations: [],
+      documentationLocations: [],
+      updatedAt: new Date("2026-05-06T00:00:00Z"),
+      _count: { analyses: 1 },
+      analyses: [{ checkedAt: new Date("2026-05-06T00:00:00Z"), score: 71 }],
+    };
+
+    it("lists repositories without a where clause when q is absent", async () => {
+      mockedPrisma.repo.findMany.mockResolvedValue([listedRepo]);
+
+      const response = await app.inject({ method: "GET", url: "/api/repositories?limit=5" });
+
+      expect(response.statusCode).toBe(200);
+      const args = mockedPrisma.repo.findMany.mock.calls[0][0] as Record<string, unknown>;
+      expect(args).not.toHaveProperty("where");
+      expect(args).toMatchObject({ orderBy: { updatedAt: "desc" }, take: 5 });
+      const body = JSON.parse(response.payload) as { repositories: Array<{ id: string }> };
+      expect(body.repositories.map((repository) => repository.id)).toEqual(["repo-id"]);
+    });
+
+    it("ignores a blank q", async () => {
+      mockedPrisma.repo.findMany.mockResolvedValue([]);
+
+      const response = await app.inject({ method: "GET", url: "/api/repositories?q=%20%20" });
+
+      expect(response.statusCode).toBe(200);
+      const args = mockedPrisma.repo.findMany.mock.calls[0][0] as Record<string, unknown>;
+      expect(args).not.toHaveProperty("where");
+    });
+
+    it("filters case-insensitively on owner, name, description, repoUrl and topics when q is set", async () => {
+      mockedPrisma.repo.findMany.mockResolvedValue([listedRepo]);
+
+      const response = await app.inject({ method: "GET", url: "/api/repositories?q=%20Zaak%20" });
+
+      expect(response.statusCode).toBe(200);
+      const args = mockedPrisma.repo.findMany.mock.calls[0][0] as Record<string, unknown>;
+      const contains = { contains: "Zaak", mode: "insensitive" };
+      expect(args.where).toEqual({
+        OR: [
+          { owner: contains },
+          { name: contains },
+          { description: contains },
+          { repoUrl: contains },
+          { topics: { has: "zaak" } },
+        ],
+      });
+      expect(args).toMatchObject({ orderBy: { updatedAt: "desc" }, take: 12 });
+    });
+  });
+
   describe("POST /api/repositories/{repoId}/analyses", () => {
     it("returns 404 when the repository does not exist", async () => {
       mockedPrisma.repo.findUnique.mockResolvedValue(null);
