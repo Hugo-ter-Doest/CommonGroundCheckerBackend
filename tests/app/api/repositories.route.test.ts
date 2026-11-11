@@ -281,5 +281,33 @@ describe("API route tests", () => {
         createdAt: "2026-05-06T00:00:00.000Z",
       });
     });
+
+    it("accepts analysis results larger than 1 MiB", async () => {
+      mockedPrisma.repo.findUnique.mockResolvedValue({ id: "repo-id" });
+      mockedPrisma.repoAnalysis.create.mockResolvedValue({
+        id: "analysis-id",
+        repoId: "repo-id",
+        scoringConfigId: null,
+        checkedAt: new Date("2026-05-06T00:00:00Z"),
+        version: null,
+        score: 80,
+        results: [],
+        createdAt: new Date("2026-05-06T00:00:00Z"),
+      });
+      const evidence = Array.from({ length: 20000 }, (_, index) => `src/components/module-${index}/views/detail/file.ts matched the interaction layer`);
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/repositories/repo-id/analyses",
+        payload: {
+          checkedAt: "2026-05-06T00:00:00Z",
+          score: 80,
+          results: [{ id: "fivelayer", title: "5-Layer", status: "pass", message: "ok", evidence }],
+        },
+      });
+
+      expect(JSON.stringify(evidence).length).toBeGreaterThan(1024 * 1024);
+      expect(response.statusCode).toBe(201);
+    });
   });
 });
