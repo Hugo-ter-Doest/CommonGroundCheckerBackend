@@ -43,6 +43,12 @@ model Repo {
   dockerLocations          String[]
   apiSpecificationLocations String[]
   documentationLocations   String[]
+  displayName              String?
+  shortDescription         String?
+  logoUrl                  String?
+  developmentStatus        String?
+  maintenanceType          String?
+  maintainers              String[] @default([])
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
   analyses  RepoAnalysis[]
