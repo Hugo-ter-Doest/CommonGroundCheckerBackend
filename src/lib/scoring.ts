@@ -64,6 +64,7 @@ export const DEFAULT_CRITERION_CONFIG_BY_CHECK_ID: Record<string, CriterionConfi
   tests: { weight: 1, requirementLevel: "mandatory" },
   cicd: { weight: 1, requirementLevel: "mandatory" },
   complexity: { weight: 1, requirementLevel: "mandatory" },
+  maintainability: { weight: 1, requirementLevel: "recommended" },
   codemetrics: { weight: 0, requirementLevel: "informative" },
   owaspsecurecoding: { weight: 1, requirementLevel: "mandatory" },
   adrvalidator: { weight: 1, requirementLevel: "mandatory" },
