@@ -570,6 +570,11 @@ components:
             - high
             - medium
             - low
+        starRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: 1 to 5 stars; from the criterion's own scale, or derived from its status
       required:
         - id
         - title
