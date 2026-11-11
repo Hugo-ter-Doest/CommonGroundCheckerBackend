@@ -60,7 +60,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.ADMIN_TOKEN = ADMIN_TOKEN;
   mockedPrisma.repo.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-    Promise.resolve(storedRepo(data))
+    storedRepo(data)
   );
   app = buildServer();
 });
