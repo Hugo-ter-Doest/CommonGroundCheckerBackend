@@ -44,6 +44,7 @@ The API supports three types of resources:
 | `GET` | `/api/repositories/export` | Export repository analysis history as CSV |
 | `POST` | `/api/repositories` | Create or update repository metadata |
 | `POST` | `/api/repositories/{repoId}/analyses` | Persist a new analysis result for an existing repository |
+| `PUT` | `/api/repositories/{repoId}/follow` | Follow or unfollow a repository for scheduled rescans (admin token required) |
 | `GET` | `/api/admin/scoring` | Retrieve the current scoring configuration snapshot |
 | `POST` | `/api/admin/scoring` | Save a new scoring configuration snapshot |
 | `GET` | `/api/repo-history` | Retrieve analysis history for a repository by owner/repo |
@@ -54,6 +55,20 @@ The API supports three types of resources:
 - The literal OpenAPI specification is stored in `src/app/api/openapi/openapi.yaml` and served by `/api/openapi`.
 - `/api/repositories/{repoId}/analyses` expects analysis result payloads including `checkedAt`, `score`, and `results`.
 - `/api/admin/scoring` exposes and persists custom scoring parameters for criterion weights, complexity thresholds, and Spectral ruleset selection.
+- `/api/repositories/{repoId}/follow` expects `{ "followed": true, "checkIntervalHours": 168 }`. The interval is `24` (daily), `168` (weekly) or `720` (monthly); when omitted, the stored interval is kept, or weekly is used when following for the first time.
+
+### Followed repositories
+
+Each repository has follow settings, returned by `/api/repositories` and `/api/repo-history`:
+
+- `followed`: whether the repository is rescanned on a schedule
+- `checkIntervalHours`: hours between scheduled checks
+- `lastCheckedAt`: when the latest analysis was stored
+- `nextCheckAt`: when the repository is next due, recalculated whenever an analysis is stored or the follow settings change; `null` when not followed
+
+### Admin access
+
+Changing follow settings requires `Authorization: Bearer <ADMIN_TOKEN>`, where `ADMIN_TOKEN` is an environment variable of the backend. Without `ADMIN_TOKEN` the follow route is disabled and answers `503`. The token is compared in constant time.
 
 ## Database
 
