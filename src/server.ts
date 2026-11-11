@@ -7,8 +7,11 @@ import { registerRepositoriesExportRoute } from "./app/api/repositories/export/r
 import { registerOpenApiRoute } from "./app/api/openapi/route";
 import { registerAdminScoringRoute } from "./app/api/admin/scoring/route";
 
+/** Analysis results of large repositories exceed Fastify's 1 MiB default. */
+const BODY_LIMIT_BYTES = 10 * 1024 * 1024;
+
 export function buildServer() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: true, bodyLimit: BODY_LIMIT_BYTES });
 
   app.register(registerRepositoriesRoutes);
   app.register(registerRepoAnalysesRoute);
