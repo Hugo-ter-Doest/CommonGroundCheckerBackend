@@ -8,6 +8,52 @@ function normalizeStringArray(value: unknown): string[] {
     : [];
 }
 
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+/** Accepts only absolute http(s) URLs, so a stored logo can never be a script or data URL. */
+function normalizeLogoUrl(value: unknown): string | null {
+  const url = normalizeOptionalString(value);
+  if (!url) {
+    return null;
+  }
+  try {
+    const protocol = new URL(url).protocol;
+    return protocol === "https:" || protocol === "http:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function publiccodeDetails(body: Record<string, unknown> | undefined) {
+  return {
+    displayName: normalizeOptionalString(body?.displayName),
+    shortDescription: normalizeOptionalString(body?.shortDescription),
+    logoUrl: normalizeLogoUrl(body?.logoUrl),
+    developmentStatus: normalizeOptionalString(body?.developmentStatus),
+    maintenanceType: normalizeOptionalString(body?.maintenanceType),
+    maintainers: normalizeStringArray(body?.maintainers),
+  };
+}
+
+type RepoPubliccodeDetails = ReturnType<typeof publiccodeDetails>;
+
+function pickPubliccodeDetails(repository: RepoPubliccodeDetails): RepoPubliccodeDetails {
+  return {
+    displayName: repository.displayName,
+    shortDescription: repository.shortDescription,
+    logoUrl: repository.logoUrl,
+    developmentStatus: repository.developmentStatus,
+    maintenanceType: repository.maintenanceType,
+    maintainers: repository.maintainers,
+  };
+}
+
 export function registerRepositoriesRoutes(fastify: FastifyInstance) {
   fastify.get("/api/repositories", async (request, reply) => {
     try {
@@ -45,6 +91,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
           dockerLocations: repository.dockerLocations,
           apiSpecificationLocations: repository.apiSpecificationLocations,
           documentationLocations: repository.documentationLocations,
+          ...pickPubliccodeDetails(repository),
           updatedAt: repository.updatedAt,
           analysisCount: repository._count.analyses,
           latestAnalysis: repository.analyses[0]
@@ -91,6 +138,8 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
         versionEvidenceDetail,
       } = body;
 
+      const details = publiccodeDetails(body);
+
       const repoRecord = await prisma.repo.upsert({
         where: { repoUrl },
         update: {
@@ -122,6 +171,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
           documentationLocations: normalizeStringArray(
             body?.documentationLocations
           ),
+          ...details,
         },
         create: {
           repoUrl,
@@ -153,6 +203,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
           documentationLocations: normalizeStringArray(
             body?.documentationLocations
           ),
+          ...details,
         },
         include: {
           _count: { select: { analyses: true } },
@@ -173,6 +224,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
         dockerLocations: repoRecord.dockerLocations,
         apiSpecificationLocations: repoRecord.apiSpecificationLocations,
         documentationLocations: repoRecord.documentationLocations,
+        ...pickPubliccodeDetails(repoRecord),
         updatedAt: repoRecord.updatedAt,
         analysisCount: repoRecord._count.analyses,
         latestAnalysis: repoRecord.analyses[0]

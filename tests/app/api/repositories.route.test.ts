@@ -170,6 +170,94 @@ describe("API route tests", () => {
       });
     });
 
+    it("stores and returns the publiccode.yml details", async () => {
+      const details = {
+        displayName: "OpenCatalogi",
+        shortDescription: "Een catalogus voor herbruikbare software",
+        logoUrl: "https://raw.githubusercontent.com/example/repo/main/docs/logo.svg",
+        developmentStatus: "stable",
+        maintenanceType: "contract",
+        maintainers: ["Conduction"],
+      };
+      mockedPrisma.repo.upsert.mockResolvedValue({
+        id: "repo-id",
+        owner: "example",
+        name: "repo",
+        repoUrl: "https://github.com/example/repo",
+        helmChartLocations: [],
+        dockerLocations: [],
+        apiSpecificationLocations: [],
+        documentationLocations: [],
+        ...details,
+        updatedAt: new Date("2026-05-06T00:00:00Z"),
+        _count: { analyses: 0 },
+        analyses: [],
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/repositories",
+        payload: {
+          repoUrl: "https://github.com/example/repo",
+          ...details,
+          displayName: "  OpenCatalogi  ",
+          maintainers: ["Conduction", 42, " "],
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const upsertArgs = mockedPrisma.repo.upsert.mock.calls[0][0] as {
+        update: Record<string, unknown>;
+        create: Record<string, unknown>;
+      };
+      expect(upsertArgs.create).toMatchObject(details);
+      expect(upsertArgs.update).toMatchObject(details);
+      expect(JSON.parse(response.payload)).toMatchObject(details);
+    });
+
+    it("stores null for unsafe or invalid publiccode.yml details", async () => {
+      mockedPrisma.repo.upsert.mockResolvedValue({
+        id: "repo-id",
+        owner: "example",
+        name: "repo",
+        repoUrl: "https://github.com/example/repo",
+        helmChartLocations: [],
+        dockerLocations: [],
+        apiSpecificationLocations: [],
+        documentationLocations: [],
+        updatedAt: new Date("2026-05-06T00:00:00Z"),
+        _count: { analyses: 0 },
+        analyses: [],
+      });
+
+      for (const logoUrl of ["javascript:alert(1)", "data:image/svg+xml;base64,PHN2Zz4=", "logo.svg"]) {
+        mockedPrisma.repo.upsert.mockClear();
+        const response = await app.inject({
+          method: "POST",
+          url: "/api/repositories",
+          payload: {
+            repoUrl: "https://github.com/example/repo",
+            displayName: 12,
+            logoUrl,
+            maintainers: "Conduction",
+          },
+        });
+
+        expect(response.statusCode).toBe(200);
+        const upsertArgs = mockedPrisma.repo.upsert.mock.calls[0][0] as {
+          create: Record<string, unknown>;
+        };
+        expect(upsertArgs.create).toMatchObject({
+          displayName: null,
+          shortDescription: null,
+          logoUrl: null,
+          developmentStatus: null,
+          maintenanceType: null,
+          maintainers: [],
+        });
+      }
+    });
+
     it("returns 400 when repoUrl is missing", async () => {
       const response = await app.inject({
         method: "POST",
@@ -192,6 +280,93 @@ describe("API route tests", () => {
       expect(response.statusCode).toBe(400);
       const body = JSON.parse(response.payload) as ErrorResponse;
       expect(body.error).toContain("Invalid GitHub or GitLab URL");
+    });
+  });
+
+  describe("GET /api/repositories", () => {
+    it("returns the publiccode.yml details of each repository", async () => {
+      mockedPrisma.repo.findMany.mockResolvedValue([
+        {
+          id: "repo-id",
+          owner: "example",
+          name: "repo",
+          repoUrl: "https://github.com/example/repo",
+          helmChartLocations: [],
+          dockerLocations: [],
+          apiSpecificationLocations: [],
+          documentationLocations: [],
+          displayName: "Open Zaak",
+          shortDescription: "Productiewaardige API's voor zaakgericht werken",
+          logoUrl: "https://raw.githubusercontent.com/example/repo/main/logo.png",
+          developmentStatus: "stable",
+          maintenanceType: "community",
+          maintainers: ["Joeri Bekker"],
+          updatedAt: new Date("2026-05-06T00:00:00Z"),
+          _count: { analyses: 2 },
+          analyses: [{ checkedAt: new Date("2026-05-06T00:00:00Z"), score: 70 }],
+        },
+      ]);
+
+      const response = await app.inject({ method: "GET", url: "/api/repositories" });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.payload) as { repositories: Array<Record<string, unknown>> };
+      expect(body.repositories[0]).toMatchObject({
+        displayName: "Open Zaak",
+        shortDescription: "Productiewaardige API's voor zaakgericht werken",
+        logoUrl: "https://raw.githubusercontent.com/example/repo/main/logo.png",
+        developmentStatus: "stable",
+        maintenanceType: "community",
+        maintainers: ["Joeri Bekker"],
+      });
+    });
+  });
+
+  describe("GET /api/repo-history", () => {
+    it("returns the publiccode.yml details in the repository metadata", async () => {
+      mockedPrisma.repo.findFirst.mockResolvedValue({
+        id: "repo-id",
+        repoUrl: "https://github.com/example/repo",
+        owner: "example",
+        name: "repo",
+        description: null,
+        language: null,
+        stars: 0,
+        forks: 0,
+        defaultBranch: "main",
+        topics: [],
+        license: null,
+        version: null,
+        versionEvidenceSource: null,
+        versionEvidenceDetail: null,
+        displayName: "OpenCatalogi",
+        shortDescription: "Een catalogus voor herbruikbare software",
+        logoUrl: null,
+        developmentStatus: "beta",
+        maintenanceType: "internal",
+        maintainers: ["Conduction"],
+        createdAt: new Date("2026-05-06T00:00:00Z"),
+        updatedAt: new Date("2026-05-06T00:00:00Z"),
+        analyses: [],
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/repo-history?owner=example&repo=repo",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.payload) as {
+        repository: { metadata: Record<string, unknown> };
+      };
+      expect(body.repository.metadata).toMatchObject({
+        displayName: "OpenCatalogi",
+        shortDescription: "Een catalogus voor herbruikbare software",
+        logoUrl: null,
+        developmentStatus: "beta",
+        maintenanceType: "internal",
+        maintainers: ["Conduction"],
+      });
     });
   });
 

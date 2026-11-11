@@ -50,7 +50,7 @@ The API supports three types of resources:
 
 ### Request/response shape
 
-- `/api/repositories` expects JSON metadata containing `repoUrl` and optional repository fields.
+- `/api/repositories` expects JSON metadata containing `repoUrl` and optional repository fields, including the publiccode.yml details `displayName`, `shortDescription`, `logoUrl`, `developmentStatus`, `maintenanceType` and `maintainers`. A `logoUrl` that is not an absolute http(s) URL is stored as null.
 - The literal OpenAPI specification is stored in `src/app/api/openapi/openapi.yaml` and served by `/api/openapi`.
 - `/api/repositories/{repoId}/analyses` expects analysis result payloads including `checkedAt`, `score`, and `results`.
 - `/api/admin/scoring` exposes and persists custom scoring parameters for criterion weights, complexity thresholds, and Spectral ruleset selection.
@@ -61,7 +61,7 @@ The service uses PostgreSQL as its primary datastore. Prisma is used for type-sa
 
 ### Primary models
 
-- `Repo` � stores repository metadata, GitHub owner/name, repository URL, topics, license, and discovered locations.
+- `Repo` � stores repository metadata, GitHub owner/name, repository URL, topics, license, and discovered locations, plus the details read from publiccode.yml: display name, short description, logo URL, development status, maintenance type and maintainers.
 - `RepoAnalysis` � stores analysis run results, score, checked timestamp, version information, and raw results payload.
 - `ScoringConfig` � stores a snapshot of scoring configuration used for a run, including criterion weights and thresholds.
 

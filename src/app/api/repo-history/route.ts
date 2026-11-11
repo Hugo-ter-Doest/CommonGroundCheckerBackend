@@ -16,6 +16,12 @@ type RepoHistoryRepository = {
   version: string | null;
   versionEvidenceSource: string | null;
   versionEvidenceDetail: string | null;
+  displayName: string | null;
+  shortDescription: string | null;
+  logoUrl: string | null;
+  developmentStatus: string | null;
+  maintenanceType: string | null;
+  maintainers: string[];
   createdAt: string;
   updatedAt: string;
   analyses: Array<{ checkedAt: Date; score: number }>;
@@ -79,6 +85,12 @@ export function registerRepoHistoryRoute(fastify: FastifyInstance) {
               : "none",
           detail: repository.versionEvidenceDetail ?? "",
         },
+        displayName: repository.displayName,
+        shortDescription: repository.shortDescription,
+        logoUrl: repository.logoUrl,
+        developmentStatus: repository.developmentStatus,
+        maintenanceType: repository.maintenanceType,
+        maintainers: repository.maintainers ?? [],
       };
 
       return {
