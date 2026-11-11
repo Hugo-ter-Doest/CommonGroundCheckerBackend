@@ -318,6 +318,9 @@ components:
           type: array
           items:
             type: string
+        isRegister:
+          type: boolean
+          description: "Whether the repository is checked as a register; sent to the checker on scheduled rescans"
         updatedAt:
           type: string
           format: date-time
@@ -412,6 +415,9 @@ components:
           type: array
           items:
             type: string
+        isRegister:
+          type: boolean
+          description: "Whether the repository is checked as a register; sent to the checker on scheduled rescans"
       required:
         - repoUrl
     CheckRequest:

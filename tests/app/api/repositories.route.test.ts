@@ -172,6 +172,37 @@ describe("API route tests", () => {
       });
     });
 
+    it("stores isRegister only when it is given as a boolean", async () => {
+      mockedPrisma.repo.upsert.mockResolvedValue({
+        id: "repo-id",
+        owner: "example",
+        name: "repo",
+        repoUrl: "https://github.com/example/repo",
+        isRegister: true,
+        _count: { analyses: 0 },
+        analyses: [],
+      });
+
+      const withFlag = await app.inject({
+        method: "POST",
+        url: "/api/repositories",
+        payload: { repoUrl: "https://github.com/example/repo", isRegister: true },
+      });
+      await app.inject({
+        method: "POST",
+        url: "/api/repositories",
+        payload: { repoUrl: "https://github.com/example/repo" },
+      });
+
+      const [first, second] = mockedPrisma.repo.upsert.mock.calls as Array<
+        [{ update: Record<string, unknown>; create: Record<string, unknown> }]
+      >;
+      expect(first[0].update.isRegister).toBe(true);
+      expect(first[0].create.isRegister).toBe(true);
+      expect(second[0].update).not.toHaveProperty("isRegister");
+      expect((JSON.parse(withFlag.payload) as { isRegister: boolean }).isRegister).toBe(true);
+    });
+
     it("returns 400 when repoUrl is missing", async () => {
       const response = await app.inject({
         method: "POST",

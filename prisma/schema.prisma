@@ -43,6 +43,7 @@ model Repo {
   dockerLocations          String[]
   apiSpecificationLocations String[]
   documentationLocations   String[]
+  isRegister               Boolean   @default(false)
   followed                 Boolean   @default(false)
   checkIntervalHours       Int?
   lastCheckedAt            DateTime?
