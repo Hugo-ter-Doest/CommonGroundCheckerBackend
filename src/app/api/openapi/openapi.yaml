@@ -156,6 +156,54 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/webhook:
+    post:
+      summary: "Register a repository for scheduled rescans or trigger a rescan"
+      description: >-
+        `register` needs `Authorization: Bearer <WEBHOOK_ADMIN_TOKEN>`. It follows the
+        repository, returns a new repository token (only once; a second register rotates it)
+        and queues an immediate rescan. `rescan` needs the repository token (or the admin
+        token) and queues an immediate rescan. At most one rescan per repository is queued at
+        a time.
+      security:
+        - webhookToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookRequest"
+      responses:
+        "202":
+          description: "Rescan queued, or already queued"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResponse"
+        "400":
+          description: "Invalid webhook payload"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Missing or invalid token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Repository not found (rescan)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: "Registration is disabled because WEBHOOK_ADMIN_TOKEN is not configured"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/repo-history:
     get:
       summary: "Return analysis history for a repository"
@@ -240,7 +288,71 @@ components:
       type: http
       scheme: bearer
       description: "The backend's ADMIN_TOKEN environment variable"
+    webhookToken:
+      type: http
+      scheme: bearer
+      description: "A repository token returned by register, or the WEBHOOK_ADMIN_TOKEN environment variable"
   schemas:
+    WebhookRequest:
+      type: object
+      properties:
+        repoUrl:
+          type: string
+        action:
+          type: string
+          enum:
+            - register
+            - rescan
+        checkIntervalHours:
+          type: integer
+          description: "register only: 24 (daily), 168 (weekly, the default) or 720 (monthly)"
+        options:
+          type: object
+          description: "register only: scan options stored with the repository and sent to the checker"
+          properties:
+            helmChartLocations:
+              type: array
+              items:
+                type: string
+            documentationLocations:
+              type: array
+              items:
+                type: string
+            dockerLocations:
+              type: array
+              items:
+                type: string
+            apiSpecificationLocations:
+              type: array
+              items:
+                type: string
+            isRegister:
+              type: boolean
+      required:
+        - repoUrl
+        - action
+    WebhookResponse:
+      type: object
+      properties:
+        repoId:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - already queued
+        nextCheckAt:
+          type:
+            - string
+            - null
+          format: date-time
+        token:
+          type: string
+          description: "register only: the repository token, returned once; only its sha256 hash is stored"
+      required:
+        - repoId
+        - status
+        - nextCheckAt
     FollowSettingsInput:
       type: object
       properties:
