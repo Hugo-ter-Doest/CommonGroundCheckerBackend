@@ -44,7 +44,7 @@ export const DEFAULT_SPECTRAL_RULESET_SOURCE =
 export const DEFAULT_CATEGORY_WEIGHTS: Record<string, number> = {
   Governance: 0.2,
   Architecture: 0.2,
-  Security: 0,
+  Security: 0.25,
   "Deployment & Operations": 0.2,
   "Software Quality": 0.15,
 };
