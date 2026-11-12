@@ -163,6 +163,7 @@ paths:
                     type: number
                 categoryWeights:
                   type: object
+                  description: "Weight per category: Governance, Security, Architecture, Maintainability, Deployment & Operations. A legacy \"Software Quality\" weight is stored as Maintainability when Maintainability is absent."
                   additionalProperties:
                     type: number
                 criterionRequirementLevels:
@@ -434,6 +435,7 @@ components:
             type: number
         categoryWeights:
           type: object
+          description: "Effective weight per category: Governance, Security, Architecture, Maintainability, Deployment & Operations. A stored legacy \"Software Quality\" weight is reported as Maintainability."
           additionalProperties:
             type: number
         criterionRequirementLevels:
