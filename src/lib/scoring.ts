@@ -46,8 +46,34 @@ export const DEFAULT_CATEGORY_WEIGHTS: Record<string, number> = {
   Architecture: 0.2,
   Security: 0,
   "Deployment & Operations": 0.2,
-  "Software Quality": 0.15,
+  Maintainability: 0.15,
 };
+
+/** Category names used by earlier versions, mapped to the category that replaced them. */
+export const LEGACY_CATEGORY_NAMES: Record<string, string> = {
+  "Software Quality": "Maintainability",
+};
+
+/**
+ * Renames legacy category keys in category weights. A legacy weight is only
+ * used when the replacing category has no weight of its own.
+ */
+export function migrateLegacyCategoryWeights(
+  weights: Record<string, number>
+): Record<string, number> {
+  const migrated: Record<string, number> = {};
+  for (const [category, weight] of Object.entries(weights)) {
+    if (!(category in LEGACY_CATEGORY_NAMES)) {
+      migrated[category] = weight;
+    }
+  }
+  for (const [legacy, current] of Object.entries(LEGACY_CATEGORY_NAMES)) {
+    if (legacy in weights && !(current in weights)) {
+      migrated[current] = weights[legacy];
+    }
+  }
+  return migrated;
+}
 
 export const DEFAULT_CRITERION_CONFIG_BY_CHECK_ID: Record<string, CriterionConfig> = {
   sourcecode: { weight: 1, requirementLevel: "mandatory" },
@@ -207,7 +233,10 @@ function parseOverridesFromDbPayload(payload: unknown): ScoringConfigOverrides {
 
   return {
     criterionWeights,
-    categoryWeights: Object.keys(categoryWeights).length > 0 ? categoryWeights : undefined,
+    categoryWeights:
+      Object.keys(categoryWeights).length > 0
+        ? migrateLegacyCategoryWeights(categoryWeights)
+        : undefined,
     criterionRequirementLevels: Object.keys(criterionRequirementLevels).length > 0 ? criterionRequirementLevels : undefined,
     complexityThreshold:
       typeof complexityThresholdRaw === "number"
@@ -329,7 +358,9 @@ export async function saveCriterionWeights(
   const overrides: ScoringConfigOverrides = {
     criterionWeights: {},
     criterionRequirementLevels: {},
-    categoryWeights,
+    categoryWeights: categoryWeights
+      ? migrateLegacyCategoryWeights(categoryWeights)
+      : undefined,
     complexityThreshold:
       typeof complexityThreshold === "number"
         ? clampComplexityThreshold(complexityThreshold)
