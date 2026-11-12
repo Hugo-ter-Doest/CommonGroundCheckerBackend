@@ -44,6 +44,7 @@ The API supports three types of resources:
 | `GET` | `/api/repositories/export` | Export repository analysis history as CSV |
 | `POST` | `/api/repositories` | Create or update repository metadata |
 | `POST` | `/api/repositories/{repoId}/analyses` | Persist a new analysis result for an existing repository |
+| `PUT` | `/api/repositories/{repoId}/follow` | Follow or unfollow a repository for scheduled rescans (admin token required) |
 | `GET` | `/api/admin/scoring` | Retrieve the current scoring configuration snapshot |
 | `POST` | `/api/admin/scoring` | Save a new scoring configuration snapshot |
 | `GET` | `/api/repo-history` | Retrieve analysis history for a repository by owner/repo |
@@ -54,6 +55,38 @@ The API supports three types of resources:
 - The literal OpenAPI specification is stored in `src/app/api/openapi/openapi.yaml` and served by `/api/openapi`.
 - `/api/repositories/{repoId}/analyses` expects analysis result payloads including `checkedAt`, `score`, and `results`.
 - `/api/admin/scoring` exposes and persists custom scoring parameters for criterion weights, complexity thresholds, and Spectral ruleset selection.
+- `/api/repositories/{repoId}/follow` expects `{ "followed": true, "checkIntervalHours": 168 }`. The interval is `24` (daily), `168` (weekly) or `720` (monthly); when omitted, the stored interval is kept, or weekly is used when following for the first time.
+
+### Followed repositories
+
+Each repository has follow settings, returned by `/api/repositories` and `/api/repo-history`:
+
+- `followed`: whether the repository is rescanned on a schedule
+- `checkIntervalHours`: hours between scheduled checks
+- `lastCheckedAt`: when the latest analysis was stored
+- `nextCheckAt`: when the repository is next due, recalculated whenever an analysis is stored or the follow settings change; `null` when not followed
+
+### Scheduled rescans
+
+When `SCHEDULER_ENABLED=true`, the backend rescans followed repositories that are due (`nextCheckAt` has passed). It does not run checks itself: it calls the checker frontend's `POST {CHECKER_URL}/api/check` with the repository URL and its stored options (the helm chart, documentation, docker and API specification locations, and `isRegister`), and the frontend stores the new analysis through this backend, which moves `nextCheckAt` on by the interval.
+
+Before a scan starts, the repository is claimed in the database by moving `nextCheckAt` forward one interval, so a scan is never started twice, also not by a second backend instance. A failed scan is logged and retried at the next interval; it does not hold up other repositories.
+
+| Variable | Default | Description |
+|---|---|---|
+| `SCHEDULER_ENABLED` | `false` | Set to `true` to run the scheduler in this process |
+| `CHECKER_URL` | none, required | Base URL of the checker frontend, for example `http://localhost:3001`; without it the scheduler does not start |
+| `SCHEDULER_TICK_SECONDS` | `60` | How often due repositories are looked up |
+| `SCHEDULER_MAX_CONCURRENT` | `2` | Maximum number of scans running at once in this process |
+| `SCHEDULER_SCAN_TIMEOUT_SECONDS` | `900` | A scan that takes longer is aborted and retried at the next interval |
+
+The scheduler stops when the server closes (also on `SIGINT` and `SIGTERM`); scans still in flight are aborted and picked up again at their next interval.
+
+`POST /api/repositories` accepts an optional boolean `isRegister`, stored with the repository and passed on to scheduled rescans.
+
+### Admin access
+
+Changing follow settings requires `Authorization: Bearer <ADMIN_TOKEN>`, where `ADMIN_TOKEN` is an environment variable of the backend. Without `ADMIN_TOKEN` the follow route is disabled and answers `503`. The token is compared in constant time.
 
 ## Database
 

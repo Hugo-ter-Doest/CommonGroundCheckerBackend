@@ -43,12 +43,18 @@ model Repo {
   dockerLocations          String[]
   apiSpecificationLocations String[]
   documentationLocations   String[]
+  isRegister               Boolean   @default(false)
+  followed                 Boolean   @default(false)
+  checkIntervalHours       Int?
+  lastCheckedAt            DateTime?
+  nextCheckAt              DateTime?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
   analyses  RepoAnalysis[]
 
   @@index([owner])
   @@index([name])
+  @@index([nextCheckAt])
 }
 
 model ScoringConfig {
