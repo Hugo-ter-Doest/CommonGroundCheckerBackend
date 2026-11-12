@@ -50,6 +50,41 @@ function normalizeResults(raw: unknown): NormalizedResult[] {
     }));
 }
 
+function normalizeCategoryRatings(raw: unknown): Record<string, number | null> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).map(([category, rating]) => [
+      category,
+      typeof rating === "number" && Number.isFinite(rating) ? rating : null,
+    ])
+  );
+}
+
+function normalizeAspectRatings(raw: unknown): Record<string, number | null> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).map(([aspect, value]) => {
+      const rating =
+        value && typeof value === "object" ? (value as Record<string, unknown>).rating : undefined;
+      return [aspect, typeof rating === "number" && Number.isFinite(rating) ? rating : null];
+    })
+  );
+}
+
+function endorsementPassed(raw: unknown): boolean | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const passed = (raw as Record<string, unknown>).passed;
+  return typeof passed === "boolean" ? passed : null;
+}
+
 export function registerRepositoriesExportRoute(fastify: FastifyInstance) {
   fastify.get("/api/repositories/export", async (request, reply) => {
     const repositories = await prisma.repo.findMany({
@@ -61,6 +96,10 @@ export function registerRepositoriesExportRoute(fastify: FastifyInstance) {
           select: {
             checkedAt: true,
             score: true,
+            rating: true,
+            categoryRatings: true,
+            aspectRatings: true,
+            endorsement: true,
             version: true,
             results: true,
           },
@@ -72,6 +111,8 @@ export function registerRepositoriesExportRoute(fastify: FastifyInstance) {
     });
 
     const resultIds = new Set<string>();
+    const ratedCategories = new Set<string>();
+    const ratedAspects = new Set<string>();
     const rows = repositories.flatMap((repository) => {
       const latestAnalysis = repository.analyses[0];
       if (!latestAnalysis) {
@@ -80,17 +121,25 @@ export function registerRepositoriesExportRoute(fastify: FastifyInstance) {
 
       const results = normalizeResults(latestAnalysis.results);
       results.forEach((result) => resultIds.add(result.id));
+      const categoryRatings = normalizeCategoryRatings(latestAnalysis.categoryRatings);
+      Object.keys(categoryRatings).forEach((category) => ratedCategories.add(category));
+      const aspectRatings = normalizeAspectRatings(latestAnalysis.aspectRatings);
+      Object.keys(aspectRatings).forEach((aspect) => ratedAspects.add(aspect));
 
       return [
         {
           repository,
           latestAnalysis,
           results,
+          categoryRatings,
+          aspectRatings,
         },
       ];
     });
 
     const sortedResultIds = Array.from(resultIds).sort();
+    const sortedCategories = Array.from(ratedCategories).sort();
+    const sortedAspects = Array.from(ratedAspects).sort();
     const resultHeaders = sortedResultIds.flatMap((id) => [
       `result_${id}_status`,
       `result_${id}_requirementLevel`,
@@ -103,13 +152,17 @@ export function registerRepositoriesExportRoute(fastify: FastifyInstance) {
       "repoUrl",
       "latestCheckedAt",
       "latestScore",
+      "latestRating",
+      ...sortedCategories.map((category) => escapeCsvCell(`rating_${category}`)),
+      ...sortedAspects.map((aspect) => escapeCsvCell(`aspect_${aspect}`)),
+      "latestPassed",
       "latestVersion",
       "analysisCount",
       ...resultHeaders,
       "latestResultsJson",
     ].join(",");
 
-    const csvRows = rows.map(({ repository, latestAnalysis, results }) => {
+    const csvRows = rows.map(({ repository, latestAnalysis, results, categoryRatings, aspectRatings }) => {
       const resultMap = new Map(results.map((result) => [result.id, result]));
 
       const rowCells = [
@@ -118,6 +171,10 @@ export function registerRepositoriesExportRoute(fastify: FastifyInstance) {
         escapeCsvCell(repository.repoUrl),
         escapeCsvCell(latestAnalysis.checkedAt.toISOString()),
         escapeCsvCell(latestAnalysis.score),
+        escapeCsvCell(latestAnalysis.rating),
+        ...sortedCategories.map((category) => escapeCsvCell(categoryRatings[category])),
+        ...sortedAspects.map((aspect) => escapeCsvCell(aspectRatings[aspect])),
+        escapeCsvCell(endorsementPassed(latestAnalysis.endorsement)),
         escapeCsvCell(latestAnalysis.version ?? ""),
         escapeCsvCell(repository._count.analyses),
         ...sortedResultIds.flatMap((id) => {
