@@ -85,6 +85,14 @@ function endorsementPassed(raw: unknown): boolean | null {
   return typeof passed === "boolean" ? passed : null;
 }
 
+function issueCount(raw: unknown, key: "errors" | "warnings"): number | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const count = (raw as Record<string, unknown>)[key];
+  return typeof count === "number" && Number.isInteger(count) ? count : null;
+}
+
 export function registerRepositoriesExportRoute(fastify: FastifyInstance) {
   fastify.get("/api/repositories/export", async (request, reply) => {
     const repositories = await prisma.repo.findMany({
@@ -100,6 +108,7 @@ export function registerRepositoriesExportRoute(fastify: FastifyInstance) {
             categoryRatings: true,
             aspectRatings: true,
             endorsement: true,
+            issueCounts: true,
             version: true,
             results: true,
           },
@@ -156,6 +165,8 @@ export function registerRepositoriesExportRoute(fastify: FastifyInstance) {
       ...sortedCategories.map((category) => escapeCsvCell(`rating_${category}`)),
       ...sortedAspects.map((aspect) => escapeCsvCell(`aspect_${aspect}`)),
       "latestPassed",
+      "latestErrors",
+      "latestWarnings",
       "latestVersion",
       "analysisCount",
       ...resultHeaders,
@@ -175,6 +186,8 @@ export function registerRepositoriesExportRoute(fastify: FastifyInstance) {
         ...sortedCategories.map((category) => escapeCsvCell(categoryRatings[category])),
         ...sortedAspects.map((aspect) => escapeCsvCell(aspectRatings[aspect])),
         escapeCsvCell(endorsementPassed(latestAnalysis.endorsement)),
+        escapeCsvCell(issueCount(latestAnalysis.issueCounts, "errors")),
+        escapeCsvCell(issueCount(latestAnalysis.issueCounts, "warnings")),
         escapeCsvCell(latestAnalysis.version ?? ""),
         escapeCsvCell(repository._count.analyses),
         ...sortedResultIds.flatMap((id) => {

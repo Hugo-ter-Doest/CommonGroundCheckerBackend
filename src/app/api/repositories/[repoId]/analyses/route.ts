@@ -73,6 +73,15 @@ function parseEndorsement(
   return { passed, reasons };
 }
 
+/** The errors and warnings a run's report lists, or null; undefined when invalid. */
+function parseIssueCounts(value: unknown): { errors: number; warnings: number } | null | undefined {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "object" || Array.isArray(value)) return undefined;
+  const { errors, warnings } = value as Record<string, unknown>;
+  if (!isCount(errors) || !isCount(warnings)) return undefined;
+  return { errors, warnings };
+}
+
 export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
   fastify.post(
     "/api/repositories/:repoId/analyses",
@@ -104,6 +113,7 @@ export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
         const categoryRatings = parseCategoryRatings(body?.categoryRatings);
         const aspectRatings = parseAspectRatings(body?.aspectRatings);
         const endorsement = parseEndorsement(body?.endorsement);
+        const issueCounts = parseIssueCounts(body?.issueCounts);
 
         if (!checkedAt || Number.isNaN(Date.parse(checkedAt))) {
           return reply
@@ -149,6 +159,13 @@ export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
           });
         }
 
+        if (issueCounts === undefined) {
+          return reply.status(400).send({
+            error:
+              "Invalid issueCounts field: expected { errors, warnings } as whole numbers of 0 or more, or null.",
+          });
+        }
+
         const analysis = await prisma.repoAnalysis.create({
           data: {
             repoId,
@@ -160,6 +177,7 @@ export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
             ...(categoryRatings ? { categoryRatings } : {}),
             ...(aspectRatings ? { aspectRatings } : {}),
             ...(endorsement ? { endorsement } : {}),
+            ...(issueCounts ? { issueCounts } : {}),
             results,
           },
         });

@@ -20,6 +20,7 @@ model RepoAnalysis {
   categoryRatings Json?
   aspectRatings   Json?
   endorsement     Json?
+  issueCounts     Json?
   results   Json
   createdAt DateTime @default(now())
 

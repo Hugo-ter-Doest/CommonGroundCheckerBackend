@@ -52,7 +52,7 @@ The API supports three types of resources:
 
 - `/api/repositories` expects JSON metadata containing `repoUrl` and optional repository fields.
 - The literal OpenAPI specification is stored in `src/app/api/openapi/openapi.yaml` and served by `/api/openapi`.
-- `/api/repositories/{repoId}/analyses` expects analysis result payloads including `checkedAt`, `score`, and `results`. It also accepts the optional `rating` (0.5 to 5.5 or null), `categoryRatings` and `aspectRatings` (ratings per category and per aspect), and `endorsement` (`{ passed, reasons }`); the history, the repository list's latest analysis and the CSV export return them.
+- `/api/repositories/{repoId}/analyses` expects analysis result payloads including `checkedAt`, `score`, and `results`. It also accepts the optional `rating` (0.5 to 5.5 or null), `categoryRatings` and `aspectRatings` (ratings per category and per aspect), `endorsement` (`{ passed, reasons }`) and `issueCounts` (`{ errors, warnings }`, the entries in the report's errors and warnings blocks); the history, the repository list's latest analysis and the CSV export return them, the counts as `latestErrors` and `latestWarnings`.
 - `/api/admin/scoring` exposes and persists custom scoring parameters for criterion weights, complexity thresholds, and Spectral ruleset selection.
 
 ## Database
