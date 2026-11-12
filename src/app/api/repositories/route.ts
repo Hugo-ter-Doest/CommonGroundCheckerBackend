@@ -27,6 +27,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
             select: {
               checkedAt: true,
               score: true,
+              version: true,
             },
           },
           _count: {
@@ -45,12 +46,14 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
           dockerLocations: repository.dockerLocations,
           apiSpecificationLocations: repository.apiSpecificationLocations,
           documentationLocations: repository.documentationLocations,
+          version: repository.version,
           updatedAt: repository.updatedAt,
           analysisCount: repository._count.analyses,
           latestAnalysis: repository.analyses[0]
             ? {
                 checkedAt: repository.analyses[0].checkedAt,
                 score: repository.analyses[0].score,
+                version: repository.analyses[0].version,
               }
             : null,
         })),
@@ -159,7 +162,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
           analyses: {
             orderBy: { checkedAt: "desc" },
             take: 1,
-            select: { checkedAt: true, score: true },
+            select: { checkedAt: true, score: true, version: true },
           },
         },
       });
@@ -173,12 +176,14 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
         dockerLocations: repoRecord.dockerLocations,
         apiSpecificationLocations: repoRecord.apiSpecificationLocations,
         documentationLocations: repoRecord.documentationLocations,
+        version: repoRecord.version,
         updatedAt: repoRecord.updatedAt,
         analysisCount: repoRecord._count.analyses,
         latestAnalysis: repoRecord.analyses[0]
           ? {
               checkedAt: repoRecord.analyses[0].checkedAt,
               score: repoRecord.analyses[0].score,
+              version: repoRecord.analyses[0].version,
             }
           : null,
       };
