@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@/lib/db";
 import { parseRepositoryUrl } from "@/lib/repo";
+import { toFollowFields } from "@/lib/follow";
 
 function normalizeStringArray(value: unknown): string[] {
   return Array.isArray(value)
@@ -46,6 +47,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
           apiSpecificationLocations: repository.apiSpecificationLocations,
           documentationLocations: repository.documentationLocations,
           updatedAt: repository.updatedAt,
+          ...toFollowFields(repository),
           analysisCount: repository._count.analyses,
           latestAnalysis: repository.analyses[0]
             ? {
@@ -174,6 +176,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
         apiSpecificationLocations: repoRecord.apiSpecificationLocations,
         documentationLocations: repoRecord.documentationLocations,
         updatedAt: repoRecord.updatedAt,
+        ...toFollowFields(repoRecord),
         analysisCount: repoRecord._count.analyses,
         latestAnalysis: repoRecord.analyses[0]
           ? {

@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import { prisma } from "@/lib/db";
 import { registerRepositoriesRoutes } from "./app/api/repositories/route";
 import { registerRepoAnalysesRoute } from "./app/api/repositories/[repoId]/analyses/route";
+import { registerRepoFollowRoute } from "./app/api/repositories/[repoId]/follow/route";
 import { registerRepoHistoryRoute } from "./app/api/repo-history/route";
 import { registerRepositoriesExportRoute } from "./app/api/repositories/export/route";
 import { registerOpenApiRoute } from "./app/api/openapi/route";
@@ -12,6 +13,7 @@ export function buildServer() {
 
   app.register(registerRepositoriesRoutes);
   app.register(registerRepoAnalysesRoute);
+  app.register(registerRepoFollowRoute);
   app.register(registerRepositoriesExportRoute);
   app.register(registerRepoHistoryRoute);
   app.register(registerOpenApiRoute);

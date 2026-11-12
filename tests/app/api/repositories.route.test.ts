@@ -7,6 +7,7 @@ vi.mock("@/lib/db", () => ({
       findUnique: vi.fn(),
       findMany: vi.fn(),
       findFirst: vi.fn(),
+      update: vi.fn(),
     },
     repoAnalysis: {
       create: vi.fn(),
@@ -24,6 +25,7 @@ type MockPrisma = {
     findUnique: ReturnType<typeof vi.fn>;
     findMany: ReturnType<typeof vi.fn>;
     findFirst: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
   };
   repoAnalysis: {
     create: ReturnType<typeof vi.fn>;
