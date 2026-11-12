@@ -8,6 +8,28 @@ function normalizeStringArray(value: unknown): string[] {
     : [];
 }
 
+interface LatestAnalysisRecord {
+  checkedAt: Date;
+  score: number;
+  rating: number | null;
+  categoryRatings: unknown;
+  aspectRatings: unknown;
+  endorsement: unknown;
+  issueCounts: unknown;
+}
+
+function toLatestAnalysis(analysis: LatestAnalysisRecord) {
+  return {
+    checkedAt: analysis.checkedAt,
+    score: analysis.score,
+    rating: analysis.rating ?? null,
+    categoryRatings: analysis.categoryRatings ?? null,
+    aspectRatings: analysis.aspectRatings ?? null,
+    endorsement: analysis.endorsement ?? null,
+    issueCounts: analysis.issueCounts ?? null,
+  };
+}
+
 export function registerRepositoriesRoutes(fastify: FastifyInstance) {
   fastify.get("/api/repositories", async (request, reply) => {
     try {
@@ -27,6 +49,11 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
             select: {
               checkedAt: true,
               score: true,
+              rating: true,
+              categoryRatings: true,
+              aspectRatings: true,
+              endorsement: true,
+              issueCounts: true,
             },
           },
           _count: {
@@ -48,10 +75,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
           updatedAt: repository.updatedAt,
           analysisCount: repository._count.analyses,
           latestAnalysis: repository.analyses[0]
-            ? {
-                checkedAt: repository.analyses[0].checkedAt,
-                score: repository.analyses[0].score,
-              }
+            ? toLatestAnalysis(repository.analyses[0])
             : null,
         })),
       };
@@ -159,7 +183,15 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
           analyses: {
             orderBy: { checkedAt: "desc" },
             take: 1,
-            select: { checkedAt: true, score: true },
+            select: {
+              checkedAt: true,
+              score: true,
+              rating: true,
+              categoryRatings: true,
+              aspectRatings: true,
+              endorsement: true,
+              issueCounts: true,
+            },
           },
         },
       });
@@ -176,10 +208,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
         updatedAt: repoRecord.updatedAt,
         analysisCount: repoRecord._count.analyses,
         latestAnalysis: repoRecord.analyses[0]
-          ? {
-              checkedAt: repoRecord.analyses[0].checkedAt,
-              score: repoRecord.analyses[0].score,
-            }
+          ? toLatestAnalysis(repoRecord.analyses[0])
           : null,
       };
     } catch (err: unknown) {

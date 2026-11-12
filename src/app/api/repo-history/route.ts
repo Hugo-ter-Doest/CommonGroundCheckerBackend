@@ -18,7 +18,15 @@ type RepoHistoryRepository = {
   versionEvidenceDetail: string | null;
   createdAt: string;
   updatedAt: string;
-  analyses: Array<{ checkedAt: Date; score: number }>;
+  analyses: Array<{
+    checkedAt: Date;
+    score: number;
+    rating: number | null;
+    categoryRatings: Record<string, number | null> | null;
+    aspectRatings: Record<string, { rating: number | null; found?: number; expected?: number }> | null;
+    endorsement: { passed: boolean; reasons: string[] } | null;
+    issueCounts: { errors: number; warnings: number } | null;
+  }>;
 };
 
 export function registerRepoHistoryRoute(fastify: FastifyInstance) {

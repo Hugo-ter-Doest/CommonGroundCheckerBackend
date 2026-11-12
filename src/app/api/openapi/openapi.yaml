@@ -236,6 +236,16 @@ components:
               format: date-time
             score:
               type: integer
+            rating:
+              $ref: "#/components/schemas/Rating"
+            categoryRatings:
+              $ref: "#/components/schemas/CategoryRatings"
+            aspectRatings:
+              $ref: "#/components/schemas/AspectRatings"
+            endorsement:
+              $ref: "#/components/schemas/Endorsement"
+            issueCounts:
+              $ref: "#/components/schemas/IssueCounts"
       required:
         - id
         - owner
@@ -318,6 +328,73 @@ components:
           type: boolean
       required:
         - repoUrl
+    Rating:
+      type:
+        - number
+        - null
+      minimum: 0.5
+      maximum: 5.5
+      description: "Continuous rating from 0.5 to 5.5, shown as 1 to 5 stars; null when no criterion counts"
+    CategoryRatings:
+      type:
+        - object
+        - null
+      additionalProperties:
+        $ref: "#/components/schemas/Rating"
+      description: "Rating per category; a category is null when none of its aspects is rated"
+    AspectRating:
+      type: object
+      properties:
+        rating:
+          $ref: "#/components/schemas/Rating"
+        found:
+          type: integer
+          minimum: 0
+          description: "For a document-count aspect: the inputs that pass"
+        expected:
+          type: integer
+          minimum: 0
+          description: "For a document-count aspect: the inputs that were measured"
+      required:
+        - rating
+    AspectRatings:
+      type:
+        - object
+        - null
+      additionalProperties:
+        $ref: "#/components/schemas/AspectRating"
+      description: "Rating per aspect id"
+    Endorsement:
+      type:
+        - object
+        - null
+      properties:
+        passed:
+          type: boolean
+          description: "No mandatory criterion fails and the overall rating is at least 2.5"
+        reasons:
+          type: array
+          items:
+            type: string
+      required:
+        - passed
+        - reasons
+    IssueCounts:
+      type:
+        - object
+        - null
+      properties:
+        errors:
+          type: integer
+          minimum: 0
+          description: "Entries in the report's errors block: failing mandatory criteria, plus an overall rating below 2.5"
+        warnings:
+          type: integer
+          minimum: 0
+          description: "Entries in the report's warnings block: missing or incomplete items"
+      required:
+        - errors
+        - warnings
     RepoAnalysisInput:
       type: object
       properties:
@@ -334,6 +411,16 @@ components:
             - null
         score:
           type: integer
+        rating:
+          $ref: "#/components/schemas/Rating"
+        categoryRatings:
+          $ref: "#/components/schemas/CategoryRatings"
+        aspectRatings:
+          $ref: "#/components/schemas/AspectRatings"
+        endorsement:
+          $ref: "#/components/schemas/Endorsement"
+        issueCounts:
+          $ref: "#/components/schemas/IssueCounts"
         results:
           type: array
           items:
@@ -362,6 +449,16 @@ components:
             - null
         score:
           type: integer
+        rating:
+          $ref: "#/components/schemas/Rating"
+        categoryRatings:
+          $ref: "#/components/schemas/CategoryRatings"
+        aspectRatings:
+          $ref: "#/components/schemas/AspectRatings"
+        endorsement:
+          $ref: "#/components/schemas/Endorsement"
+        issueCounts:
+          $ref: "#/components/schemas/IssueCounts"
         results:
           type: array
           items:

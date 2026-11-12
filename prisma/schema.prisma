@@ -16,6 +16,11 @@ model RepoAnalysis {
   checkedAt DateTime
   version   String?
   score     Int
+  rating    Float?
+  categoryRatings Json?
+  aspectRatings   Json?
+  endorsement     Json?
+  issueCounts     Json?
   results   Json
   createdAt DateTime @default(now())
 
