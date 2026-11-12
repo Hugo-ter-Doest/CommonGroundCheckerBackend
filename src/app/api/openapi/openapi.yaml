@@ -221,6 +221,11 @@ components:
           type: array
           items:
             type: string
+        version:
+          type:
+            - string
+            - null
+          description: "Version detected on the repository's most recent scan"
         updatedAt:
           type: string
           format: date-time
@@ -236,6 +241,11 @@ components:
               format: date-time
             score:
               type: integer
+            version:
+              type:
+                - string
+                - null
+              description: "Version detected when this analysis ran"
       required:
         - id
         - owner
@@ -245,6 +255,7 @@ components:
         - dockerLocations
         - apiSpecificationLocations
         - documentationLocations
+        - version
         - updatedAt
         - analysisCount
         - latestAnalysis

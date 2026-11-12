@@ -46,8 +46,11 @@ type RepoPostResponse = {
   name: string;
   repoUrl: string;
   analysisCount: number;
-  latestAnalysis: { checkedAt: string; score: number };
+  version: string | null;
+  latestAnalysis: { checkedAt: string; score: number; version: string | null } | null;
 };
+
+type RepoListResponse = { repositories: RepoPostResponse[] };
 
 type AnalysisResponse = {
   id: string;
@@ -87,6 +90,68 @@ describe("API route tests", () => {
     });
   });
 
+  describe("GET /api/repositories", () => {
+    const baseRepo = {
+      owner: "example",
+      repoUrl: "https://github.com/example/repo",
+      helmChartLocations: [],
+      dockerLocations: [],
+      apiSpecificationLocations: [],
+      documentationLocations: [],
+      updatedAt: new Date("2026-05-06T00:00:00Z"),
+    };
+
+    it("returns the repository version and the latest analysis version", async () => {
+      mockedPrisma.repo.findMany.mockResolvedValue([
+        {
+          ...baseRepo,
+          id: "with-versions",
+          name: "with-versions",
+          version: "v2.1.0",
+          _count: { analyses: 2 },
+          analyses: [{ checkedAt: new Date("2026-05-06T00:00:00Z"), score: 70, version: "v2.0.0" }],
+        },
+        {
+          ...baseRepo,
+          id: "without-versions",
+          name: "without-versions",
+          version: null,
+          _count: { analyses: 1 },
+          analyses: [{ checkedAt: new Date("2026-05-06T00:00:00Z"), score: 30, version: null }],
+        },
+        {
+          ...baseRepo,
+          id: "never-analysed",
+          name: "never-analysed",
+          version: "v0.1.0",
+          _count: { analyses: 0 },
+          analyses: [],
+        },
+      ]);
+
+      const response = await app.inject({ method: "GET", url: "/api/repositories" });
+      expect(response.statusCode).toBe(200);
+
+      const body = JSON.parse(response.payload) as RepoListResponse;
+      expect(body.repositories.map((repository) => [repository.version, repository.latestAnalysis])).toEqual([
+        ["v2.1.0", { checkedAt: "2026-05-06T00:00:00.000Z", score: 70, version: "v2.0.0" }],
+        [null, { checkedAt: "2026-05-06T00:00:00.000Z", score: 30, version: null }],
+        ["v0.1.0", null],
+      ]);
+    });
+
+    it("selects the version of the latest analysis", async () => {
+      mockedPrisma.repo.findMany.mockResolvedValue([]);
+
+      await app.inject({ method: "GET", url: "/api/repositories" });
+
+      const [findManyArgs] = mockedPrisma.repo.findMany.mock.calls[0] as [
+        { include: { analyses: { select: Record<string, boolean> } } },
+      ];
+      expect(findManyArgs.include.analyses.select).toEqual({ checkedAt: true, score: true, version: true });
+    });
+  });
+
   describe("POST /api/repositories", () => {
     it("creates or updates repository metadata with a valid GitHub repoUrl", async () => {
       const mockRepo = {
@@ -98,9 +163,10 @@ describe("API route tests", () => {
         dockerLocations: [],
         apiSpecificationLocations: [],
         documentationLocations: [],
+        version: "v1.2.0",
         updatedAt: new Date("2026-05-06T00:00:00Z"),
         _count: { analyses: 1 },
-        analyses: [{ checkedAt: new Date("2026-05-06T00:00:00Z"), score: 42 }],
+        analyses: [{ checkedAt: new Date("2026-05-06T00:00:00Z"), score: 42, version: "v1.1.0" }],
       };
       mockedPrisma.repo.upsert.mockResolvedValue(mockRepo);
 
@@ -122,11 +188,17 @@ describe("API route tests", () => {
         name: "repo",
         repoUrl: "https://github.com/example/repo",
         analysisCount: 1,
+        version: "v1.2.0",
       });
       expect(body.latestAnalysis).toEqual({
         checkedAt: mockRepo.analyses[0].checkedAt.toISOString(),
         score: 42,
+        version: "v1.1.0",
       });
+      const [upsertArgs] = mockedPrisma.repo.upsert.mock.calls[0] as [
+        { include: { analyses: { select: Record<string, boolean> } } },
+      ];
+      expect(upsertArgs.include.analyses.select).toEqual({ checkedAt: true, score: true, version: true });
     });
 
     it("creates or updates repository metadata with a valid GitLab repoUrl", async () => {
