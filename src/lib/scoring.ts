@@ -68,6 +68,7 @@ export const DEFAULT_CRITERION_CONFIG_BY_CHECK_ID: Record<string, CriterionConfi
   owaspsecurecoding: { weight: 1, requirementLevel: "mandatory" },
   adrvalidator: { weight: 1, requirementLevel: "mandatory" },
   contributing: { weight: 1, requirementLevel: "mandatory" },
+  maintenance: { weight: 1, requirementLevel: "recommended" },
   codeofconduct: { weight: 1, requirementLevel: "mandatory" },
   security: { weight: 1, requirementLevel: "mandatory" },
   semver: { weight: 1, requirementLevel: "mandatory" },
