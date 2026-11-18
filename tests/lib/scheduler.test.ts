@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { Agent, fetch as undiciFetch, getGlobalDispatcher, setGlobalDispatcher } from "undici";
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -11,7 +14,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { prisma } from "@/lib/db";
-import { createScheduler, readSchedulerConfig } from "@/lib/scheduler";
+import { createScheduler, readSchedulerConfig, type ScanFetch } from "@/lib/scheduler";
 
 type MockFn = ReturnType<typeof vi.fn>;
 const mockedPrisma = prisma as unknown as {
@@ -53,7 +56,7 @@ function scheduler(fetchFn: MockFn, maxConcurrent = 2) {
     maxConcurrent,
     scanTimeoutSeconds: 900,
     logger,
-    fetchFn: fetchFn as unknown as typeof fetch,
+    fetchFn: fetchFn as unknown as ScanFetch,
   });
 }
 
@@ -240,6 +243,118 @@ describe("scheduler", () => {
     await s.idle();
 
     expect(logger.error.mock.calls[0][0]).toMatchObject({ repoId: "a", error: "aborted" });
+  });
+
+  it("logs the duration of each finished and failed scan", async () => {
+    mockedPrisma.repo.findMany.mockResolvedValue([dueRepo("a"), dueRepo("b")]);
+    const fetchFn = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        await new Promise((r) => setTimeout(r, 4_000));
+        return new Response("{}", { status: 200 });
+      })
+      .mockImplementationOnce(async () => {
+        await new Promise((r) => setTimeout(r, 2_500));
+        throw new Error("connection refused");
+      });
+    const s = scheduler(fetchFn);
+
+    await s.tick();
+    await vi.advanceTimersByTimeAsync(4_000);
+    await s.idle();
+
+    expect(logger.info).toHaveBeenCalledWith(
+      { repoId: "a", repoUrl: "https://github.com/example/a", durationSeconds: 4 },
+      "Scheduled rescan finished"
+    );
+    expect(logger.error.mock.calls[0][0]).toMatchObject({ repoId: "b", durationSeconds: 2.5 });
+  });
+
+  it("passes a dispatcher that waits for the checker as long as the scan timeout", async () => {
+    mockedPrisma.repo.findMany.mockResolvedValue([dueRepo("a")]);
+    const fetchFn = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const s = scheduler(fetchFn);
+
+    await s.tick();
+    await s.idle();
+
+    const [, init] = fetchFn.mock.calls[0] as Parameters<ScanFetch>;
+    expect(init.dispatcher).toBeInstanceOf(Agent);
+  });
+});
+
+describe("scheduler against a slow checker", () => {
+  let server: Server;
+  let checkerUrl: string;
+  let headerDelayMs = 0;
+  const original = getGlobalDispatcher();
+
+  beforeEach(async () => {
+    vi.useRealTimers();
+    server = createServer((req, res) => {
+      req.resume();
+      setTimeout(() => {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end("{}");
+      }, headerDelayMs).unref();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    checkerUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    // Stands in for undici's 300 s default, scaled down so the test runs fast.
+    // undici checks its timeouts about once a second, so 1 s is the smallest useful value.
+    setGlobalDispatcher(new Agent({ headersTimeout: 1_000 }));
+  });
+
+  afterEach(async () => {
+    setGlobalDispatcher(original);
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  function realScheduler(scanTimeoutSeconds: number) {
+    return createScheduler({
+      checkerUrl,
+      tickSeconds: 10,
+      maxConcurrent: 1,
+      scanTimeoutSeconds,
+      logger,
+    });
+  }
+
+  it("fails on the default dispatcher when the headers come after its headersTimeout", async () => {
+    headerDelayMs = 2_500;
+    await expect(undiciFetch(`${checkerUrl}/api/check`, { method: "POST" })).rejects.toThrow(
+      "fetch failed"
+    );
+  });
+
+  it("still succeeds when the headers come after the default headersTimeout", async () => {
+    headerDelayMs = 2_500;
+    mockedPrisma.repo.findMany.mockResolvedValue([dueRepo("a")]);
+    const s = realScheduler(6);
+
+    await s.tick();
+    await s.idle();
+
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ repoId: "a" }),
+      "Scheduled rescan finished"
+    );
+  });
+
+  it("aborts at scanTimeoutSeconds when the checker takes longer", async () => {
+    headerDelayMs = 3_000;
+    mockedPrisma.repo.findMany.mockResolvedValue([dueRepo("a")]);
+    const s = realScheduler(0.8);
+
+    await s.tick();
+    await s.idle();
+
+    const [fields] = logger.error.mock.calls[0] as [{ error: string; durationSeconds: number }];
+    expect(fields.error).toMatch(/abort/i);
+    expect(fields.durationSeconds).toBeGreaterThanOrEqual(0.7);
+    expect(fields.durationSeconds).toBeLessThan(2);
   });
 });
 

@@ -1,3 +1,4 @@
+import { Agent, fetch as undiciFetch, type Dispatcher } from "undici";
 import { prisma } from "@/lib/db";
 import { computeNextCheckAt } from "@/lib/follow";
 
@@ -6,13 +7,25 @@ type SchedulerLogger = {
   error: (obj: object, msg?: string) => void;
 };
 
+/** The part of `fetch` the scheduler uses; `dispatcher` carries the scan's connection timeouts. */
+export type ScanFetch = (
+  url: string,
+  init: {
+    method: string;
+    headers: Record<string, string>;
+    body: string;
+    signal: AbortSignal;
+    dispatcher: Dispatcher;
+  }
+) => Promise<{ ok: boolean; status: number; body?: { cancel(): Promise<void> } | null }>;
+
 export type SchedulerOptions = {
   checkerUrl: string;
   tickSeconds: number;
   maxConcurrent: number;
   scanTimeoutSeconds: number;
   logger: SchedulerLogger;
-  fetchFn?: typeof fetch;
+  fetchFn?: ScanFetch;
 };
 
 type DueRepository = {
@@ -52,7 +65,11 @@ export function readSchedulerConfig(env: NodeJS.ProcessEnv = process.env) {
  * retried at the next interval.
  */
 export function createScheduler(options: SchedulerOptions) {
-  const fetchFn = options.fetchFn ?? fetch;
+  const fetchFn: ScanFetch = options.fetchFn ?? undiciFetch;
+  // undici's defaults stop waiting for response headers or body data after
+  // 300 s, well before a long scan ends; the abort timeout below is the limit.
+  const scanTimeoutMs = options.scanTimeoutSeconds * 1000;
+  const dispatcher = new Agent({ headersTimeout: scanTimeoutMs, bodyTimeout: scanTimeoutMs });
   const running = new Map<string, AbortController>();
   const inFlight = new Set<Promise<void>>();
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -73,7 +90,9 @@ export function createScheduler(options: SchedulerOptions) {
   }
 
   async function scan(repository: DueRepository, controller: AbortController) {
-    const timeout = setTimeout(() => controller.abort(), options.scanTimeoutSeconds * 1000);
+    const timeout = setTimeout(() => controller.abort(), scanTimeoutMs);
+    const startedAt = Date.now();
+    const durationSeconds = () => Math.round((Date.now() - startedAt) / 100) / 10;
     try {
       const response = await fetchFn(`${options.checkerUrl}/api/check`, {
         method: "POST",
@@ -87,12 +106,14 @@ export function createScheduler(options: SchedulerOptions) {
           isRegister: repository.isRegister,
         }),
         signal: controller.signal,
+        dispatcher,
       });
+      await response.body?.cancel();
       if (!response.ok) {
         throw new Error(`Checker responded with HTTP ${response.status}`);
       }
       options.logger.info(
-        { repoId: repository.id, repoUrl: repository.repoUrl },
+        { repoId: repository.id, repoUrl: repository.repoUrl, durationSeconds: durationSeconds() },
         "Scheduled rescan finished"
       );
     } catch (err: unknown) {
@@ -101,6 +122,7 @@ export function createScheduler(options: SchedulerOptions) {
           repoId: repository.id,
           repoUrl: repository.repoUrl,
           error: err instanceof Error ? err.message : String(err),
+          durationSeconds: durationSeconds(),
         },
         "Scheduled rescan failed; retrying at the next interval"
       );
