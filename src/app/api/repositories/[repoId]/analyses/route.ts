@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@/lib/db";
+import { computeNextCheckAt } from "@/lib/follow";
 
 export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
   fastify.post(
@@ -47,14 +48,27 @@ export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
             .send({ error: "Missing or invalid results field." });
         }
 
+        const checkedAtDate = new Date(checkedAt);
         const analysis = await prisma.repoAnalysis.create({
           data: {
             repoId,
             scoringConfigId,
-            checkedAt: new Date(checkedAt),
+            checkedAt: checkedAtDate,
             version,
             score,
             results,
+          },
+        });
+
+        await prisma.repo.update({
+          where: { id: repoId },
+          data: {
+            lastCheckedAt: checkedAtDate,
+            nextCheckAt: computeNextCheckAt(
+              repository.followed,
+              repository.checkIntervalHours,
+              checkedAtDate
+            ),
           },
         });
 

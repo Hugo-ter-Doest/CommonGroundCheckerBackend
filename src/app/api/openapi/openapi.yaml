@@ -107,6 +107,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/repositories/{repoId}/follow:
+    put:
+      summary: "Follow or unfollow a repository for scheduled rescans"
+      description: "Admin only. Requires `Authorization: Bearer <ADMIN_TOKEN>`. Disabled with 503 when the backend has no ADMIN_TOKEN configured."
+      security:
+        - adminToken: []
+      parameters:
+        - name: repoId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FollowSettingsInput"
+      responses:
+        "200":
+          description: "Follow settings saved"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FollowSettings"
+        "400":
+          description: "Invalid follow settings"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Missing or invalid admin token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Repository not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: "Admin actions are disabled because ADMIN_TOKEN is not configured"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/repo-history:
     get:
       summary: "Return analysis history for a repository"
@@ -186,7 +235,55 @@ paths:
               schema:
                 $ref: "#/components/schemas/ScoringConfigResponse"
 components:
+  securitySchemes:
+    adminToken:
+      type: http
+      scheme: bearer
+      description: "The backend's ADMIN_TOKEN environment variable"
   schemas:
+    FollowSettingsInput:
+      type: object
+      properties:
+        followed:
+          type: boolean
+        checkIntervalHours:
+          type:
+            - integer
+            - null
+          description: "24 (daily), 168 (weekly) or 720 (monthly). Defaults to the stored interval, or 168 when following for the first time"
+      required:
+        - followed
+    FollowSettings:
+      type: object
+      properties:
+        id:
+          type: string
+        followed:
+          type: boolean
+          description: "Whether the repository is rescanned on a schedule"
+        checkIntervalHours:
+          type:
+            - integer
+            - null
+          description: "Hours between scheduled checks: 24 (daily), 168 (weekly) or 720 (monthly)"
+        lastCheckedAt:
+          type:
+            - string
+            - null
+          format: date-time
+          description: "When the latest analysis was stored"
+        nextCheckAt:
+          type:
+            - string
+            - null
+          format: date-time
+          description: "When the repository is next due for a scheduled check"
+      required:
+        - id
+        - followed
+        - checkIntervalHours
+        - lastCheckedAt
+        - nextCheckAt
     ErrorResponse:
       type: object
       properties:
@@ -221,9 +318,32 @@ components:
           type: array
           items:
             type: string
+        isRegister:
+          type: boolean
+          description: "Whether the repository is checked as a register; sent to the checker on scheduled rescans"
         updatedAt:
           type: string
           format: date-time
+        followed:
+          type: boolean
+          description: "Whether the repository is rescanned on a schedule"
+        checkIntervalHours:
+          type:
+            - integer
+            - null
+          description: "Hours between scheduled checks: 24 (daily), 168 (weekly) or 720 (monthly)"
+        lastCheckedAt:
+          type:
+            - string
+            - null
+          format: date-time
+          description: "When the latest analysis was stored"
+        nextCheckAt:
+          type:
+            - string
+            - null
+          format: date-time
+          description: "When the repository is next due for a scheduled check"
         analysisCount:
           type: integer
         latestAnalysis:
@@ -246,6 +366,10 @@ components:
         - apiSpecificationLocations
         - documentationLocations
         - updatedAt
+        - followed
+        - checkIntervalHours
+        - lastCheckedAt
+        - nextCheckAt
         - analysisCount
         - latestAnalysis
     RepoMetadata:
@@ -291,6 +415,9 @@ components:
           type: array
           items:
             type: string
+        isRegister:
+          type: boolean
+          description: "Whether the repository is checked as a register; sent to the checker on scheduled rescans"
       required:
         - repoUrl
     CheckRequest:
@@ -392,6 +519,26 @@ components:
               type: string
             metadata:
               $ref: "#/components/schemas/RepoMeta"
+            followed:
+              type: boolean
+              description: "Whether the repository is rescanned on a schedule"
+            checkIntervalHours:
+              type:
+                - integer
+                - null
+              description: "Hours between scheduled checks: 24 (daily), 168 (weekly) or 720 (monthly)"
+            lastCheckedAt:
+              type:
+                - string
+                - null
+              format: date-time
+              description: "When the latest analysis was stored"
+            nextCheckAt:
+              type:
+                - string
+                - null
+              format: date-time
+              description: "When the repository is next due for a scheduled check"
             createdAt:
               type: string
               format: date-time
@@ -404,6 +551,10 @@ components:
             - owner
             - name
             - metadata
+            - followed
+            - checkIntervalHours
+            - lastCheckedAt
+            - nextCheckAt
             - createdAt
             - updatedAt
         analyses:
