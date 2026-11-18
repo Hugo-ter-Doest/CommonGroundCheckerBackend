@@ -306,6 +306,11 @@ components:
         checkIntervalHours:
           type: integer
           description: "register only: 24 (daily), 168 (weekly, the default) or 720 (monthly)"
+        scanRef:
+          type:
+            - string
+            - null
+          description: "register only: the branch or tag scheduled scans use; empty for the default branch, \"latest-release\" for the newest stable release, or a branch or tag name"
         options:
           type: object
           description: "register only: scan options stored with the repository and sent to the checker"
@@ -363,6 +368,11 @@ components:
             - integer
             - null
           description: "24 (daily), 168 (weekly) or 720 (monthly). Defaults to the stored interval, or 168 when following for the first time"
+        scanRef:
+          type:
+            - string
+            - null
+          description: "The branch or tag scheduled scans use: null for the default branch, \"latest-release\" for the newest stable release, or a branch or tag name"
       required:
         - followed
     FollowSettings:
@@ -378,6 +388,11 @@ components:
             - integer
             - null
           description: "Hours between scheduled checks: 24 (daily), 168 (weekly) or 720 (monthly)"
+        scanRef:
+          type:
+            - string
+            - null
+          description: "The branch or tag scheduled scans use: null for the default branch, \"latest-release\" for the newest stable release, or a branch or tag name"
         lastCheckedAt:
           type:
             - string
@@ -394,6 +409,7 @@ components:
         - id
         - followed
         - checkIntervalHours
+        - scanRef
         - lastCheckedAt
         - nextCheckAt
     ErrorResponse:
@@ -444,6 +460,11 @@ components:
             - integer
             - null
           description: "Hours between scheduled checks: 24 (daily), 168 (weekly) or 720 (monthly)"
+        scanRef:
+          type:
+            - string
+            - null
+          description: "The branch or tag scheduled scans use: null for the default branch, \"latest-release\" for the newest stable release, or a branch or tag name"
         lastCheckedAt:
           type:
             - string
@@ -480,6 +501,7 @@ components:
         - updatedAt
         - followed
         - checkIntervalHours
+        - scanRef
         - lastCheckedAt
         - nextCheckAt
         - analysisCount
@@ -555,6 +577,9 @@ components:
             type: string
         isRegister:
           type: boolean
+        ref:
+          type: string
+          description: "The branch or tag to scan; empty for the default branch, or \"latest-release\" for the newest stable release"
       required:
         - repoUrl
     RepoAnalysisInput:
@@ -571,6 +596,21 @@ components:
           type:
             - string
             - null
+        scannedRef:
+          type:
+            - string
+            - null
+          description: "The branch or tag name that was scanned, for example development or v1.2.0"
+        scannedRefKind:
+          type:
+            - string
+            - null
+          description: "How the scanned ref was chosen: default-branch, branch, release, or tag (the newest semver tag when there is no release)"
+        scannedCommit:
+          type:
+            - string
+            - null
+          description: "The commit SHA that was scanned"
         score:
           type: integer
         results:
@@ -599,6 +639,21 @@ components:
           type:
             - string
             - null
+        scannedRef:
+          type:
+            - string
+            - null
+          description: "The branch or tag name that was scanned, for example development or v1.2.0"
+        scannedRefKind:
+          type:
+            - string
+            - null
+          description: "How the scanned ref was chosen: default-branch, branch, release, or tag (the newest semver tag when there is no release)"
+        scannedCommit:
+          type:
+            - string
+            - null
+          description: "The commit SHA that was scanned"
         score:
           type: integer
         results:
@@ -639,6 +694,11 @@ components:
                 - integer
                 - null
               description: "Hours between scheduled checks: 24 (daily), 168 (weekly) or 720 (monthly)"
+            scanRef:
+              type:
+                - string
+                - null
+              description: "The branch or tag scheduled scans use: null for the default branch, \"latest-release\" for the newest stable release, or a branch or tag name"
             lastCheckedAt:
               type:
                 - string
@@ -665,6 +725,7 @@ components:
             - metadata
             - followed
             - checkIntervalHours
+            - scanRef
             - lastCheckedAt
             - nextCheckAt
             - createdAt

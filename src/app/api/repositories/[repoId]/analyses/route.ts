@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "@/lib/db";
 import { computeNextCheckAt } from "@/lib/follow";
 
+const SCANNED_REF_KINDS = ["default-branch", "branch", "release", "tag"];
+
 export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
   fastify.post(
     "/api/repositories/:repoId/analyses",
@@ -29,6 +31,14 @@ export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
             ? body.scoringConfigId
             : null;
         const version = typeof body?.version === "string" ? body.version : null;
+        const scannedRef = typeof body?.scannedRef === "string" ? body.scannedRef : null;
+        const scannedRefKind =
+          typeof body?.scannedRefKind === "string" &&
+          SCANNED_REF_KINDS.includes(body.scannedRefKind)
+            ? body.scannedRefKind
+            : null;
+        const scannedCommit =
+          typeof body?.scannedCommit === "string" ? body.scannedCommit : null;
 
         if (!checkedAt || Number.isNaN(Date.parse(checkedAt))) {
           return reply
@@ -55,6 +65,9 @@ export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
             scoringConfigId,
             checkedAt: checkedAtDate,
             version,
+            scannedRef,
+            scannedRefKind,
+            scannedCommit,
             score,
             results,
           },

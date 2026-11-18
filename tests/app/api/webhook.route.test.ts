@@ -130,6 +130,35 @@ describe("POST /api/webhook", () => {
       expect(args.update.checkIntervalHours).toBe(24);
     });
 
+    it("stores the given scanRef", async () => {
+      await post(
+        { repoUrl: REPO_URL, action: "register", scanRef: "latest-release" },
+        ADMIN_TOKEN
+      );
+
+      const [args] = mockedPrisma.repo.upsert.mock.calls[0] as [UpsertArgs];
+      expect(args.update.scanRef).toBe("latest-release");
+      expect(args.create).toMatchObject({ scanRef: "latest-release" });
+    });
+
+    it("leaves scanRef alone when register does not give one", async () => {
+      await post({ repoUrl: REPO_URL, action: "register" }, ADMIN_TOKEN);
+
+      const [args] = mockedPrisma.repo.upsert.mock.calls[0] as [UpsertArgs];
+      expect(args.update).not.toHaveProperty("scanRef");
+    });
+
+    it("returns 400 for an invalid scanRef", async () => {
+      const { statusCode, body } = await post(
+        { repoUrl: REPO_URL, action: "register", scanRef: "bad name" },
+        ADMIN_TOKEN
+      );
+
+      expect(statusCode).toBe(400);
+      expect(body.error).toContain("Invalid scanRef");
+      expect(mockedPrisma.repo.upsert).not.toHaveBeenCalled();
+    });
+
     it("rotates the token when an existing repository is registered again", async () => {
       const first = await post({ repoUrl: REPO_URL, action: "register" }, ADMIN_TOKEN);
       const second = await post({ repoUrl: REPO_URL, action: "register" }, ADMIN_TOKEN);

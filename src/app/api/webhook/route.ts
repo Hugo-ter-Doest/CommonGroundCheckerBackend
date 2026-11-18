@@ -6,6 +6,7 @@ import {
   ALLOWED_CHECK_INTERVAL_HOURS,
   DEFAULT_CHECK_INTERVAL_HOURS,
   isAllowedCheckInterval,
+  parseScanRef,
 } from "@/lib/follow";
 import { parseRepositoryUrl } from "@/lib/repo";
 
@@ -91,6 +92,14 @@ export function registerWebhookRoute(fastify: FastifyInstance) {
           ? body.checkIntervalHours
           : DEFAULT_CHECK_INTERVAL_HOURS;
 
+        const scanRef = body.scanRef === undefined ? undefined : parseScanRef(body.scanRef);
+        if (body.scanRef !== undefined && scanRef === undefined) {
+          return reply.status(400).send({
+            error:
+              'Invalid scanRef: expected an empty value (the default branch), "latest-release", or a branch or tag name.',
+          });
+        }
+
         const options = extractOptions(body.options);
         const token = generateRepositoryToken();
         const now = new Date();
@@ -99,6 +108,7 @@ export function registerWebhookRoute(fastify: FastifyInstance) {
           checkIntervalHours,
           nextCheckAt: now,
           webhookTokenHash: sha256Hex(token),
+          ...(scanRef !== undefined ? { scanRef } : {}),
           ...(options.helmChartLocations ? { helmChartLocations: options.helmChartLocations } : {}),
           ...(options.documentationLocations
             ? { documentationLocations: options.documentationLocations }

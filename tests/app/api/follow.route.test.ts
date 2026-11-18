@@ -79,6 +79,15 @@ function putFollow(payload: unknown, token: string | null = ADMIN_TOKEN) {
   });
 }
 
+function updateData() {
+  return (mockedPrisma.repo.update.mock.calls[0] as [{ data: Record<string, unknown> }])[0].data;
+}
+
+function createdAnalysisData() {
+  return (mockedPrisma.repoAnalysis.create.mock.calls[0] as [{ data: Record<string, unknown> }])[0]
+    .data;
+}
+
 describe("PUT /api/repositories/{repoId}/follow", () => {
   it("follows a repository and schedules the next check from the last check", async () => {
     mockedPrisma.repo.findUnique.mockResolvedValue(storedRepo());
@@ -98,9 +107,57 @@ describe("PUT /api/repositories/{repoId}/follow", () => {
       id: "repo-id",
       followed: true,
       checkIntervalHours: 24,
+      scanRef: null,
       lastCheckedAt: "2026-11-01T10:00:00.000Z",
       nextCheckAt: "2026-11-02T10:00:00.000Z",
     });
+  });
+
+  it("stores a branch to scan", async () => {
+    mockedPrisma.repo.findUnique.mockResolvedValue(storedRepo());
+
+    const response = await putFollow({ followed: true, scanRef: " development " });
+
+    expect(response.statusCode).toBe(200);
+    expect(updateData()).toMatchObject({
+      scanRef: "development",
+    });
+    expect(JSON.parse(response.payload)).toMatchObject({ scanRef: "development" });
+  });
+
+  it("stores latest-release as the ref to scan", async () => {
+    mockedPrisma.repo.findUnique.mockResolvedValue(storedRepo());
+
+    const response = await putFollow({ followed: true, scanRef: "latest-release" });
+
+    expect(JSON.parse(response.payload)).toMatchObject({ scanRef: "latest-release" });
+  });
+
+  it("goes back to the default branch for an empty scanRef", async () => {
+    mockedPrisma.repo.findUnique.mockResolvedValue(storedRepo({ scanRef: "development" }));
+
+    const response = await putFollow({ followed: true, scanRef: "" });
+
+    expect(updateData()).toMatchObject({ scanRef: null });
+    expect(JSON.parse(response.payload)).toMatchObject({ scanRef: null });
+  });
+
+  it("keeps the stored scanRef when the request leaves it out", async () => {
+    mockedPrisma.repo.findUnique.mockResolvedValue(storedRepo({ scanRef: "development" }));
+
+    await putFollow({ followed: true });
+
+    expect(updateData()).not.toHaveProperty("scanRef");
+  });
+
+  it("returns 400 for a scanRef that is not a valid branch or tag name", async () => {
+    mockedPrisma.repo.findUnique.mockResolvedValue(storedRepo());
+
+    const response = await putFollow({ followed: true, scanRef: "feature..x" });
+
+    expect(response.statusCode).toBe(400);
+    expect((JSON.parse(response.payload) as { error: string }).error).toContain("Invalid scanRef");
+    expect(mockedPrisma.repo.update).not.toHaveBeenCalled();
   });
 
   it("defaults to a weekly interval when following without one", async () => {
@@ -266,6 +323,47 @@ describe("storing an analysis", () => {
         lastCheckedAt: new Date("2026-11-10T08:00:00Z"),
         nextCheckAt: new Date("2026-11-17T08:00:00Z"),
       },
+    });
+  });
+
+  it("stores the scanned ref, its kind and the commit", async () => {
+    mockedPrisma.repo.findUnique.mockResolvedValue(storedRepo());
+    mockedPrisma.repoAnalysis.create.mockResolvedValue({ id: "analysis-id" });
+
+    await app.inject({
+      method: "POST",
+      url: "/api/repositories/repo-id/analyses",
+      payload: {
+        checkedAt: "2026-11-10T08:00:00Z",
+        score: 70,
+        results: [],
+        scannedRef: "v1.2.0",
+        scannedRefKind: "release",
+        scannedCommit: "abc1234def5678",
+      },
+    });
+
+    expect(createdAnalysisData()).toMatchObject({
+      scannedRef: "v1.2.0",
+      scannedRefKind: "release",
+      scannedCommit: "abc1234def5678",
+    });
+  });
+
+  it("stores no scanned ref for an older checker and drops an unknown kind", async () => {
+    mockedPrisma.repo.findUnique.mockResolvedValue(storedRepo());
+    mockedPrisma.repoAnalysis.create.mockResolvedValue({ id: "analysis-id" });
+
+    await app.inject({
+      method: "POST",
+      url: "/api/repositories/repo-id/analyses",
+      payload: { checkedAt: "2026-11-10T08:00:00Z", score: 70, results: [], scannedRefKind: "pr" },
+    });
+
+    expect(createdAnalysisData()).toMatchObject({
+      scannedRef: null,
+      scannedRefKind: null,
+      scannedCommit: null,
     });
   });
 

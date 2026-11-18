@@ -6,6 +6,7 @@ import {
   DEFAULT_CHECK_INTERVAL_HOURS,
   computeNextCheckAt,
   isAllowedCheckInterval,
+  parseScanRef,
   toFollowFields,
 } from "@/lib/follow";
 
@@ -33,6 +34,14 @@ export function registerRepoFollowRoute(fastify: FastifyInstance) {
         });
       }
 
+      const scanRef = body.scanRef === undefined ? undefined : parseScanRef(body.scanRef);
+      if (body.scanRef !== undefined && scanRef === undefined) {
+        return reply.status(400).send({
+          error:
+            'Invalid scanRef: expected an empty value (the default branch), "latest-release", or a branch or tag name.',
+        });
+      }
+
       const repository = await prisma.repo.findUnique({ where: { id: repoId } });
       if (!repository) {
         return reply.status(404).send({ error: "Repository not found." });
@@ -52,6 +61,7 @@ export function registerRepoFollowRoute(fastify: FastifyInstance) {
         data: {
           followed,
           checkIntervalHours,
+          ...(scanRef !== undefined ? { scanRef } : {}),
           nextCheckAt: computeNextCheckAt(
             followed,
             checkIntervalHours,

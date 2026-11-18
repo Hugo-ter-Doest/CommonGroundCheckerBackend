@@ -98,6 +98,24 @@ describe("scheduler", () => {
     });
   });
 
+  it("asks the checker to scan the repository's scanRef when one is set", async () => {
+    mockedPrisma.repo.findMany.mockResolvedValue([
+      dueRepo("a", { scanRef: "development" }),
+      dueRepo("b", { scanRef: null }),
+    ]);
+    const fetchFn = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    const s = scheduler(fetchFn);
+
+    await s.tick();
+    await s.idle();
+
+    const bodies = fetchFn.mock.calls.map(
+      ([, init]) => JSON.parse((init as RequestInit).body as string) as Record<string, unknown>
+    );
+    expect(bodies[0]).toMatchObject({ repoUrl: "https://github.com/example/a", ref: "development" });
+    expect(bodies[1]).not.toHaveProperty("ref");
+  });
+
   it("claims a repository by moving nextCheckAt forward before calling the checker", async () => {
     const repo = dueRepo("a");
     mockedPrisma.repo.findMany.mockResolvedValue([repo]);

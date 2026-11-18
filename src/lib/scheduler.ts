@@ -39,6 +39,7 @@ type DueRepository = {
   dockerLocations: string[];
   apiSpecificationLocations: string[];
   isRegister: boolean;
+  scanRef: string | null;
 };
 
 function positiveNumber(value: string | undefined, fallback: number): number {
@@ -104,6 +105,7 @@ export function createScheduler(options: SchedulerOptions) {
           dockerLocations: repository.dockerLocations,
           apiSpecificationLocations: repository.apiSpecificationLocations,
           isRegister: repository.isRegister,
+          ...(repository.scanRef ? { ref: repository.scanRef } : {}),
         }),
         signal: controller.signal,
         dispatcher,
