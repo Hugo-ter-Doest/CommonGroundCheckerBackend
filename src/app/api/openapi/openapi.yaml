@@ -310,7 +310,7 @@ components:
           type:
             - string
             - null
-          description: "register only: the branch or tag scheduled scans use; empty for the default branch, \"latest-release\" for the newest stable release, or a branch or tag name"
+          description: "register only: the branch or tag scheduled scans use; empty for the released version, \"default-branch\", \"latest-release\", or a branch or tag name"
         options:
           type: object
           description: "register only: scan options stored with the repository and sent to the checker"
@@ -372,7 +372,7 @@ components:
           type:
             - string
             - null
-          description: "The branch or tag scheduled scans use: null for the default branch, \"latest-release\" for the newest stable release, or a branch or tag name"
+          description: "The branch or tag scheduled scans use: null for the released version (the tag of the publiccode.yml softwareVersion, else the latest release), \"default-branch\", \"latest-release\", or a branch or tag name"
       required:
         - followed
     FollowSettings:
@@ -392,7 +392,7 @@ components:
           type:
             - string
             - null
-          description: "The branch or tag scheduled scans use: null for the default branch, \"latest-release\" for the newest stable release, or a branch or tag name"
+          description: "The branch or tag scheduled scans use: null for the released version (the tag of the publiccode.yml softwareVersion, else the latest release), \"default-branch\", \"latest-release\", or a branch or tag name"
         lastCheckedAt:
           type:
             - string
@@ -464,7 +464,7 @@ components:
           type:
             - string
             - null
-          description: "The branch or tag scheduled scans use: null for the default branch, \"latest-release\" for the newest stable release, or a branch or tag name"
+          description: "The branch or tag scheduled scans use: null for the released version (the tag of the publiccode.yml softwareVersion, else the latest release), \"default-branch\", \"latest-release\", or a branch or tag name"
         lastCheckedAt:
           type:
             - string
@@ -579,7 +579,7 @@ components:
           type: boolean
         ref:
           type: string
-          description: "The branch or tag to scan; empty for the default branch, or \"latest-release\" for the newest stable release"
+          description: "The branch or tag to scan; empty for the released version, \"default-branch\" for the default branch, \"latest-release\" for the newest stable release"
       required:
         - repoUrl
     RepoAnalysisInput:
@@ -605,7 +605,7 @@ components:
           type:
             - string
             - null
-          description: "How the scanned ref was chosen: default-branch, branch, release, or tag (the newest semver tag when there is no release)"
+          description: "Why the scanned ref was chosen: declared-version (the tag of the publiccode.yml softwareVersion), release (the newest stable release), tag (the newest stable semver tag), branch (named in the request), default-branch (asked for), or default-branch-fallback (no release found)"
         scannedCommit:
           type:
             - string
@@ -648,7 +648,7 @@ components:
           type:
             - string
             - null
-          description: "How the scanned ref was chosen: default-branch, branch, release, or tag (the newest semver tag when there is no release)"
+          description: "Why the scanned ref was chosen: declared-version (the tag of the publiccode.yml softwareVersion), release (the newest stable release), tag (the newest stable semver tag), branch (named in the request), default-branch (asked for), or default-branch-fallback (no release found)"
         scannedCommit:
           type:
             - string
@@ -698,7 +698,7 @@ components:
               type:
                 - string
                 - null
-              description: "The branch or tag scheduled scans use: null for the default branch, \"latest-release\" for the newest stable release, or a branch or tag name"
+              description: "The branch or tag scheduled scans use: null for the released version (the tag of the publiccode.yml softwareVersion, else the latest release), \"default-branch\", \"latest-release\", or a branch or tag name"
             lastCheckedAt:
               type:
                 - string

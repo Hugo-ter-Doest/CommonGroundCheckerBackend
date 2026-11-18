@@ -54,9 +54,9 @@ The API supports three types of resources:
 
 - `/api/repositories` expects JSON metadata containing `repoUrl` and optional repository fields.
 - The literal OpenAPI specification is stored in `src/app/api/openapi/openapi.yaml` and served by `/api/openapi`.
-- `/api/repositories/{repoId}/analyses` expects analysis result payloads including `checkedAt`, `score`, and `results`, and optionally `scannedRef`, `scannedRefKind` (`default-branch`, `branch`, `release` or `tag`) and `scannedCommit`: the branch or tag and commit that were scanned.
+- `/api/repositories/{repoId}/analyses` expects analysis result payloads including `checkedAt`, `score`, and `results`, and optionally `scannedRef`, `scannedRefKind` (why that ref was chosen: `declared-version`, `release`, `tag`, `branch`, `default-branch` or `default-branch-fallback`) and `scannedCommit`: the branch or tag and commit that were scanned.
 - `/api/admin/scoring` exposes and persists custom scoring parameters for criterion weights, complexity thresholds, and Spectral ruleset selection.
-- `/api/repositories/{repoId}/follow` expects `{ "followed": true, "checkIntervalHours": 168 }`. The interval is `24` (daily), `168` (weekly) or `720` (monthly); when omitted, the stored interval is kept, or weekly is used when following for the first time. An optional `scanRef` chooses what scheduled scans read: empty or `null` for the default branch, `latest-release` for the newest stable release, or a branch or tag name such as `development`; when omitted, the stored value is kept.
+- `/api/repositories/{repoId}/follow` expects `{ "followed": true, "checkIntervalHours": 168 }`. The interval is `24` (daily), `168` (weekly) or `720` (monthly); when omitted, the stored interval is kept, or weekly is used when following for the first time. An optional `scanRef` chooses what scheduled scans read: empty or `null` lets the checker scan the released version (the tag of the publiccode.yml `softwareVersion`, else the newest stable release or semver tag, else the default branch with a warning), `default-branch` the default branch, `latest-release` the newest stable release, or a branch or tag name such as `development`; when omitted, the stored value is kept.
 
 ### Followed repositories
 
@@ -64,7 +64,7 @@ Each repository has follow settings, returned by `/api/repositories` and `/api/r
 
 - `followed`: whether the repository is rescanned on a schedule
 - `checkIntervalHours`: hours between scheduled checks
-- `scanRef`: the branch or tag scheduled scans use (`null` is the default branch, `latest-release` the newest stable release)
+- `scanRef`: the branch or tag scheduled scans use (`null` is the released version, `default-branch` the default branch, `latest-release` the newest stable release)
 - `lastCheckedAt`: when the latest analysis was stored
 - `nextCheckAt`: when the repository is next due, recalculated whenever an analysis is stored or the follow settings change; `null` when not followed
 
@@ -94,7 +94,7 @@ The scheduler stops when the server closes (also on `SIGINT` and `SIGTERM`); sca
 { "repoUrl": "https://github.com/owner/repo", "action": "register" | "rescan", "checkIntervalHours": 168, "scanRef": "development", "options": { "helmChartLocations": ["charts/app"], "isRegister": false } }
 ```
 
-- `register` needs `Authorization: Bearer <WEBHOOK_ADMIN_TOKEN>`. It follows the repository with the given interval (default weekly) and `scanRef` (default: the default branch), stores `options` with it, queues an immediate rescan and returns a new **repository token**. The token is shown only in this response; the backend stores only its sha256 hash. Registering an existing repository again rotates the token. Without `WEBHOOK_ADMIN_TOKEN` registration is disabled (`503`).
+- `register` needs `Authorization: Bearer <WEBHOOK_ADMIN_TOKEN>`. It follows the repository with the given interval (default weekly) and `scanRef` (default: the released version), stores `options` with it, queues an immediate rescan and returns a new **repository token**. The token is shown only in this response; the backend stores only its sha256 hash. Registering an existing repository again rotates the token. Without `WEBHOOK_ADMIN_TOKEN` registration is disabled (`503`).
 - `rescan` needs `Authorization: Bearer <repository token>` (the admin token works too). It queues an immediate rescan through the scheduler.
 - Both answer `202` with `repoId`, `status` (`queued` or `already queued`) and `nextCheckAt`. At most one rescan per repository is queued at a time: while one is waiting or running in this process, a further request answers `already queued`. An unknown repository gives `404`, a wrong token `401`. Tokens are compared in constant time.
 

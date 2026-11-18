@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { parseScanRef, toFollowFields } from "@/lib/follow";
 
 describe("parseScanRef", () => {
-  it("reads null and an empty or blank string as the default branch", () => {
+  it("reads null and an empty or blank string as the released version", () => {
     expect(parseScanRef(null)).toBeNull();
     expect(parseScanRef("")).toBeNull();
     expect(parseScanRef("   ")).toBeNull();
@@ -10,6 +10,7 @@ describe("parseScanRef", () => {
 
   it("accepts latest-release and branch or tag names, trimmed", () => {
     expect(parseScanRef("latest-release")).toBe("latest-release");
+    expect(parseScanRef("default-branch")).toBe("default-branch");
     expect(parseScanRef(" development ")).toBe("development");
     expect(parseScanRef("release/2.x")).toBe("release/2.x");
     expect(parseScanRef("v1.2.0")).toBe("v1.2.0");

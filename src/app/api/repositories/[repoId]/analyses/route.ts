@@ -2,7 +2,14 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "@/lib/db";
 import { computeNextCheckAt } from "@/lib/follow";
 
-const SCANNED_REF_KINDS = ["default-branch", "branch", "release", "tag"];
+const SCANNED_REF_KINDS = [
+  "declared-version",
+  "release",
+  "tag",
+  "branch",
+  "default-branch",
+  "default-branch-fallback",
+];
 
 export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
   fastify.post(

@@ -29,18 +29,22 @@ export function computeNextCheckAt(
 /** The `scanRef` value that scans the newest stable release instead of a branch. */
 export const LATEST_RELEASE_SCAN_REF = "latest-release";
 
+/** The `scanRef` value that always scans the default branch. */
+export const DEFAULT_BRANCH_SCAN_REF = "default-branch";
+
 /**
- * Reads a `scanRef` setting. An empty string or null means the default
- * branch and is stored as null; otherwise the value is `latest-release` or a
- * branch or tag name that follows git's ref-name rules. Returns `undefined`
- * for a value that is not one of these.
+ * Reads a `scanRef` setting. An empty string or null lets the checker scan
+ * the released version and is stored as null; otherwise the value is
+ * `default-branch`, `latest-release` or a branch or tag name that follows
+ * git's ref-name rules. Returns `undefined` for a value that is not one of
+ * these.
  */
 export function parseScanRef(value: unknown): string | null | undefined {
   if (value === null) return null;
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   if (!trimmed) return null;
-  if (trimmed === LATEST_RELEASE_SCAN_REF) return trimmed;
+  if (trimmed === LATEST_RELEASE_SCAN_REF || trimmed === DEFAULT_BRANCH_SCAN_REF) return trimmed;
   const valid =
     trimmed.length <= 255 &&
     !/[\s~^:?*[\\\x00-\x1f\x7f]/.test(trimmed) &&

@@ -125,15 +125,17 @@ describe("PUT /api/repositories/{repoId}/follow", () => {
     expect(JSON.parse(response.payload)).toMatchObject({ scanRef: "development" });
   });
 
-  it("stores latest-release as the ref to scan", async () => {
+  it("stores latest-release and default-branch as the ref to scan", async () => {
     mockedPrisma.repo.findUnique.mockResolvedValue(storedRepo());
 
-    const response = await putFollow({ followed: true, scanRef: "latest-release" });
+    const release = await putFollow({ followed: true, scanRef: "latest-release" });
+    const branch = await putFollow({ followed: true, scanRef: "default-branch" });
 
-    expect(JSON.parse(response.payload)).toMatchObject({ scanRef: "latest-release" });
+    expect(JSON.parse(release.payload)).toMatchObject({ scanRef: "latest-release" });
+    expect(JSON.parse(branch.payload)).toMatchObject({ scanRef: "default-branch" });
   });
 
-  it("goes back to the default branch for an empty scanRef", async () => {
+  it("goes back to the released version for an empty scanRef", async () => {
     mockedPrisma.repo.findUnique.mockResolvedValue(storedRepo({ scanRef: "development" }));
 
     const response = await putFollow({ followed: true, scanRef: "" });
@@ -337,17 +339,36 @@ describe("storing an analysis", () => {
         checkedAt: "2026-11-10T08:00:00Z",
         score: 70,
         results: [],
-        scannedRef: "v1.2.0",
-        scannedRefKind: "release",
+        scannedRef: "v1.2.2",
+        scannedRefKind: "declared-version",
         scannedCommit: "abc1234def5678",
       },
     });
 
     expect(createdAnalysisData()).toMatchObject({
-      scannedRef: "v1.2.0",
-      scannedRefKind: "release",
+      scannedRef: "v1.2.2",
+      scannedRefKind: "declared-version",
       scannedCommit: "abc1234def5678",
     });
+  });
+
+  it("stores the default-branch fallback kind", async () => {
+    mockedPrisma.repo.findUnique.mockResolvedValue(storedRepo());
+    mockedPrisma.repoAnalysis.create.mockResolvedValue({ id: "analysis-id" });
+
+    await app.inject({
+      method: "POST",
+      url: "/api/repositories/repo-id/analyses",
+      payload: {
+        checkedAt: "2026-11-10T08:00:00Z",
+        score: 70,
+        results: [],
+        scannedRef: "main",
+        scannedRefKind: "default-branch-fallback",
+      },
+    });
+
+    expect(createdAnalysisData()).toMatchObject({ scannedRefKind: "default-branch-fallback" });
   });
 
   it("stores no scanned ref for an older checker and drops an unknown kind", async () => {

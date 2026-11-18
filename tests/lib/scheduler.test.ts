@@ -102,9 +102,10 @@ describe("scheduler", () => {
     mockedPrisma.repo.findMany.mockResolvedValue([
       dueRepo("a", { scanRef: "development" }),
       dueRepo("b", { scanRef: null }),
+      dueRepo("c", { scanRef: "default-branch" }),
     ]);
     const fetchFn = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
-    const s = scheduler(fetchFn);
+    const s = scheduler(fetchFn, 3);
 
     await s.tick();
     await s.idle();
@@ -114,6 +115,7 @@ describe("scheduler", () => {
     );
     expect(bodies[0]).toMatchObject({ repoUrl: "https://github.com/example/a", ref: "development" });
     expect(bodies[1]).not.toHaveProperty("ref");
+    expect(bodies[2]).toMatchObject({ ref: "default-branch" });
   });
 
   it("claims a repository by moving nextCheckAt forward before calling the checker", async () => {
