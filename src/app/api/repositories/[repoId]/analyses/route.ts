@@ -1,5 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@/lib/db";
+import { computeNextCheckAt } from "@/lib/follow";
+
+const SCANNED_REF_KINDS = [
+  "declared-version",
+  "release",
+  "tag",
+  "branch",
+  "default-branch",
+  "default-branch-fallback",
+];
 
 export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
   fastify.post(
@@ -28,6 +38,14 @@ export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
             ? body.scoringConfigId
             : null;
         const version = typeof body?.version === "string" ? body.version : null;
+        const scannedRef = typeof body?.scannedRef === "string" ? body.scannedRef : null;
+        const scannedRefKind =
+          typeof body?.scannedRefKind === "string" &&
+          SCANNED_REF_KINDS.includes(body.scannedRefKind)
+            ? body.scannedRefKind
+            : null;
+        const scannedCommit =
+          typeof body?.scannedCommit === "string" ? body.scannedCommit : null;
 
         if (!checkedAt || Number.isNaN(Date.parse(checkedAt))) {
           return reply
@@ -47,14 +65,30 @@ export function registerRepoAnalysesRoute(fastify: FastifyInstance) {
             .send({ error: "Missing or invalid results field." });
         }
 
+        const checkedAtDate = new Date(checkedAt);
         const analysis = await prisma.repoAnalysis.create({
           data: {
             repoId,
             scoringConfigId,
-            checkedAt: new Date(checkedAt),
+            checkedAt: checkedAtDate,
             version,
+            scannedRef,
+            scannedRefKind,
+            scannedCommit,
             score,
             results,
+          },
+        });
+
+        await prisma.repo.update({
+          where: { id: repoId },
+          data: {
+            lastCheckedAt: checkedAtDate,
+            nextCheckAt: computeNextCheckAt(
+              repository.followed,
+              repository.checkIntervalHours,
+              checkedAtDate
+            ),
           },
         });
 

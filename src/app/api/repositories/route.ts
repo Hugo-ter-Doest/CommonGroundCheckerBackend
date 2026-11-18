@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@/lib/db";
 import { parseRepositoryUrl } from "@/lib/repo";
+import { toFollowFields } from "@/lib/follow";
 
 function normalizeStringArray(value: unknown): string[] {
   return Array.isArray(value)
@@ -45,7 +46,9 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
           dockerLocations: repository.dockerLocations,
           apiSpecificationLocations: repository.apiSpecificationLocations,
           documentationLocations: repository.documentationLocations,
+          isRegister: repository.isRegister,
           updatedAt: repository.updatedAt,
+          ...toFollowFields(repository),
           analysisCount: repository._count.analyses,
           latestAnalysis: repository.analyses[0]
             ? {
@@ -90,6 +93,8 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
         versionEvidenceSource,
         versionEvidenceDetail,
       } = body;
+      const isRegister =
+        typeof body?.isRegister === "boolean" ? { isRegister: body.isRegister } : {};
 
       const repoRecord = await prisma.repo.upsert({
         where: { repoUrl },
@@ -122,6 +127,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
           documentationLocations: normalizeStringArray(
             body?.documentationLocations
           ),
+          ...isRegister,
         },
         create: {
           repoUrl,
@@ -153,6 +159,7 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
           documentationLocations: normalizeStringArray(
             body?.documentationLocations
           ),
+          ...isRegister,
         },
         include: {
           _count: { select: { analyses: true } },
@@ -173,7 +180,9 @@ export function registerRepositoriesRoutes(fastify: FastifyInstance) {
         dockerLocations: repoRecord.dockerLocations,
         apiSpecificationLocations: repoRecord.apiSpecificationLocations,
         documentationLocations: repoRecord.documentationLocations,
+        isRegister: repoRecord.isRegister,
         updatedAt: repoRecord.updatedAt,
+        ...toFollowFields(repoRecord),
         analysisCount: repoRecord._count.analyses,
         latestAnalysis: repoRecord.analyses[0]
           ? {

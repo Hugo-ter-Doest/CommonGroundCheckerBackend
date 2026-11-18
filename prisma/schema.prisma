@@ -15,6 +15,9 @@ model RepoAnalysis {
   scoringConfig   ScoringConfig? @relation(fields: [scoringConfigId], references: [id], onDelete: SetNull)
   checkedAt DateTime
   version   String?
+  scannedRef     String?
+  scannedRefKind String?
+  scannedCommit  String?
   score     Int
   results   Json
   createdAt DateTime @default(now())
@@ -43,12 +46,20 @@ model Repo {
   dockerLocations          String[]
   apiSpecificationLocations String[]
   documentationLocations   String[]
+  isRegister               Boolean   @default(false)
+  followed                 Boolean   @default(false)
+  checkIntervalHours       Int?
+  scanRef                  String?
+  lastCheckedAt            DateTime?
+  nextCheckAt              DateTime?
+  webhookTokenHash         String?
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
   analyses  RepoAnalysis[]
 
   @@index([owner])
   @@index([name])
+  @@index([nextCheckAt])
 }
 
 model ScoringConfig {
