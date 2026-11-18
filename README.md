@@ -44,6 +44,7 @@ The API supports three types of resources:
 | `GET` | `/api/repositories/export` | Export repository analysis history as CSV |
 | `POST` | `/api/repositories` | Create or update repository metadata |
 | `POST` | `/api/repositories/{repoId}/analyses` | Persist a new analysis result for an existing repository |
+| `POST` | `/api/webhook` | Register a repository for scheduled rescans or trigger a rescan from CI |
 | `PUT` | `/api/repositories/{repoId}/follow` | Follow or unfollow a repository for scheduled rescans (admin token required) |
 | `GET` | `/api/admin/scoring` | Retrieve the current scoring configuration snapshot |
 | `POST` | `/api/admin/scoring` | Save a new scoring configuration snapshot |
@@ -83,6 +84,76 @@ Before a scan starts, the repository is claimed in the database by moving `nextC
 The scheduler stops when the server closes (also on `SIGINT` and `SIGTERM`); scans still in flight are aborted and picked up again at their next interval.
 
 `POST /api/repositories` accepts an optional boolean `isRegister`, stored with the repository and passed on to scheduled rescans.
+
+### Rescan webhook
+
+`POST /api/webhook` lets a repository register itself for scheduled rescans and trigger a rescan from its own CI, the same way from GitHub Actions, GitLab CI or any other git flow.
+
+```json
+{ "repoUrl": "https://github.com/owner/repo", "action": "register" | "rescan", "checkIntervalHours": 168, "options": { "helmChartLocations": ["charts/app"], "isRegister": false } }
+```
+
+- `register` needs `Authorization: Bearer <WEBHOOK_ADMIN_TOKEN>`. It follows the repository with the given interval (default weekly), stores `options` with it, queues an immediate rescan and returns a new **repository token**. The token is shown only in this response; the backend stores only its sha256 hash. Registering an existing repository again rotates the token. Without `WEBHOOK_ADMIN_TOKEN` registration is disabled (`503`).
+- `rescan` needs `Authorization: Bearer <repository token>` (the admin token works too). It queues an immediate rescan through the scheduler.
+- Both answer `202` with `repoId`, `status` (`queued` or `already queued`) and `nextCheckAt`. At most one rescan per repository is queued at a time: while one is waiting or running in this process, a further request answers `already queued`. An unknown repository gives `404`, a wrong token `401`. Tokens are compared in constant time.
+
+Queued rescans are started by the scheduler, so `SCHEDULER_ENABLED=true` and `CHECKER_URL` must be set for a queued rescan to be picked up when the concurrency limit was reached at the time of the request.
+
+Register once, for example:
+
+```bash
+curl -X POST https://checker-api.example.org/api/webhook \
+  -H "Authorization: Bearer $WEBHOOK_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"repoUrl": "https://github.com/owner/repo", "action": "register", "checkIntervalHours": 168}'
+```
+
+Store the returned `token` as a secret in the repository (for example `CG_CHECKER_TOKEN`) and the backend URL as a variable (`CG_CHECKER_URL`).
+
+GitHub Actions, `.github/workflows/common-ground-check.yml`:
+
+```yaml
+name: Common Ground check
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+
+jobs:
+  rescan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger a Common Ground Checker rescan
+        env:
+          CG_CHECKER_URL: ${{ vars.CG_CHECKER_URL }}
+          CG_CHECKER_TOKEN: ${{ secrets.CG_CHECKER_TOKEN }}
+        run: |
+          curl --fail-with-body -sS -X POST "$CG_CHECKER_URL/api/webhook" \
+            -H "Authorization: Bearer $CG_CHECKER_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"repoUrl\": \"${{ github.server_url }}/${{ github.repository }}\", \"action\": \"rescan\"}"
+```
+
+Replace `main` with the repository's default branch. GitLab CI, in `.gitlab-ci.yml`, with `CG_CHECKER_URL` and a masked `CG_CHECKER_TOKEN` as CI/CD variables:
+
+```yaml
+common-ground-rescan:
+  stage: deploy
+  image: curlimages/curl:8.10.1
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  script:
+    - >
+      curl --fail-with-body -sS -X POST "$CG_CHECKER_URL/api/webhook"
+      -H "Authorization: Bearer $CG_CHECKER_TOKEN"
+      -H "Content-Type: application/json"
+      -d "{\"repoUrl\": \"$CI_PROJECT_URL\", \"action\": \"rescan\"}"
+```
+
+The `repoUrl` must match the URL the repository was registered with.
 
 ### Admin access
 
